@@ -206,21 +206,53 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
   } catch {}
 });
 
-// ── Pending selector from element picker ──────────────
-async function checkPendingSelector() {
-  const result = await chrome.storage.local.get(['pendingSelector']);
-  if (!result.pendingSelector) return;
-  await chrome.storage.local.remove(['pendingSelector']);
-  advancedSection.classList.add('open');
-  toggleIcon.classList.add('open');
-  domSelectorInput.value = result.pendingSelector;
-  showToast(t('toastSelectorFilled', result.pendingSelector));
+// ── Restore picker state on popup open ────────────────
+// Called on init. Reads form data + picked selector saved before popup closed.
+async function restorePickerState() {
+  const result = await chrome.storage.local.get(['pendingFormState', 'pendingSelector']);
+  if (!result.pendingFormState && !result.pendingSelector) return;
+
+  // Restore form fields saved before the picker was launched
+  if (result.pendingFormState) {
+    const s = result.pendingFormState;
+    fromInput.value  = s.from  || '';
+    toInput.value    = s.to    || '';
+    const radio = document.querySelector(`input[name="urlMode"][value="${s.urlMode || 'all'}"]`);
+    if (radio) radio.checked = true;
+    customUrlRow.style.display  = s.urlMode === 'custom' ? 'block' : 'none';
+    urlPatternInput.value       = s.urlPattern  || '';
+    includeInputsCb.checked     = !!s.includeInputs;
+    includeEditableCb.checked   = !!s.includeEditable;
+    await chrome.storage.local.remove(['pendingFormState']);
+  }
+
+  // Fill picked selector and show confirmation
+  if (result.pendingSelector) {
+    advancedSection.classList.add('open');
+    toggleIcon.classList.add('open');
+    domSelectorInput.value = result.pendingSelector;
+    await chrome.storage.local.remove(['pendingSelector']);
+    showToast(t('toastSelectorFilled', result.pendingSelector));
+  }
 }
 
 // ── Element picker ─────────────────────────────────────
 q('pickBtn').addEventListener('click', async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) { showToast(t('toastNoPage')); return; }
+
+  // Persist current form data so it survives popup close/reopen
+  await chrome.storage.local.set({
+    pendingFormState: {
+      from:            fromInput.value,
+      to:              toInput.value,
+      urlMode:         document.querySelector('input[name="urlMode"]:checked')?.value || 'all',
+      urlPattern:      urlPatternInput.value,
+      includeInputs:   includeInputsCb.checked,
+      includeEditable: includeEditableCb.checked,
+    },
+  });
+
   const sendPick = () =>
     chrome.tabs.sendMessage(tab.id, { type: 'TEXT_SWAP_PICK_START' });
   try {
@@ -231,6 +263,7 @@ q('pickBtn').addEventListener('click', async () => {
       await sendPick();
     } catch {
       showToast(t('toastNoPick'));
+      await chrome.storage.local.remove(['pendingFormState']);
       return;
     }
   }
@@ -440,5 +473,5 @@ toInput.addEventListener('keydown',   e => { if (e.key === 'Enter') addRule(); }
   lang  = localResult.lang || 'zh_CN';
   await loadMessages(lang);
   applyTranslations();
-  await checkPendingSelector();
+  await restorePickerState();
 })();

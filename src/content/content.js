@@ -281,6 +281,8 @@ async function exitPickMode(selector) {
 
   if (selector) {
     await chrome.storage.local.set({ pendingSelector: selector });
+    // Ask background to reopen the popup (Chrome 127+, no user gesture needed)
+    chrome.runtime.sendMessage({ type: 'TEXT_SWAP_OPEN_POPUP' }).catch(() => {});
     showPageToast(msg('pickDone', selector));
   } else {
     showPageToast(msg('pickCancel'));
