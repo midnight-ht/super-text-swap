@@ -1,0 +1,62 @@
+{
+  "extName": {
+    "message": "TextSwap - Web Text Replacer",
+    "description": "Extension name shown in Chrome"
+  },
+  "extDesc": {
+    "message": "Automatically replace specified text on web pages. Image text replacement coming soon.",
+    "description": "Extension description shown in Chrome"
+  },
+
+  "langToggle":  { "message": "中",            "description": "Label shown on language toggle button" },
+  "applyBtn":    { "message": "⟳ Apply Now" },
+  "subtitle":    { "message": "Web Text Replacer" },
+
+  "fromLabel":   { "message": "From" },
+  "fromPh":      { "message": "Text to replace" },
+  "toLabel":     { "message": "To" },
+  "toPh":        { "message": "Replacement text" },
+
+  "advancedTitle":       { "message": "Scope & Targets" },
+  "urlScopeLabel":       { "message": "URL Scope" },
+  "urlAll":              { "message": "All pages" },
+  "urlDomain":           { "message": "Current domain" },
+  "urlCustom":           { "message": "Custom" },
+  "urlPh":               { "message": "e.g. *.example.com or example.com/post/*" },
+  "domScopeLabel":       { "message": "Limit to element" },
+  "domPh":               { "message": "CSS selector (empty = entire page)" },
+  "pickBtn":             { "message": "⊕ Pick" },
+  "targetLabel":         { "message": "Extra Targets" },
+  "includeInputsLabel":  { "message": "Input fields (input / textarea)" },
+  "includeEditableLabel":{ "message": "Rich text editor (contenteditable)" },
+
+  "addBtn":      { "message": "Add Rule" },
+  "clearBtn":    { "message": "Clear All" },
+  "rulesTitle":  { "message": "Rules" },
+  "rulesEmpty":  { "message": "No rules yet" },
+  "countSuffix": { "message": "" },
+  "badgeInput":    { "message": "input" },
+  "badgeEditable": { "message": "rich-text" },
+
+  "toastAdded":           { "message": "Rule added" },
+  "toastDeleted":         { "message": "Rule deleted" },
+  "toastCleared":         { "message": "All rules cleared" },
+  "toastApplied":         { "message": "Applied to current page" },
+  "toastNoPage":          { "message": "Cannot access current page" },
+  "toastNoInject":        { "message": "Script injection not allowed here" },
+  "toastNoPick":          { "message": "Element picking not supported here" },
+  "toastNoRules":         { "message": "No rules to clear" },
+  "toastExists":          { "message": "Source text already exists" },
+  "toastFromRequired":    { "message": "Please enter source text" },
+  "toastSelectorFilled": {
+    "message": "Selector filled: $SELECTOR$",
+    "placeholders": { "selector": { "content": "$1", "example": ".article-content" } }
+  },
+
+  "pickPrompt": { "message": "Click target element  ·  Esc to cancel" },
+  "pickDone": {
+    "message": "Selected: $SELECTOR$  ·  Reopen the extension popup",
+    "placeholders": { "selector": { "content": "$1" } }
+  },
+  "pickCancel": { "message": "Cancelled" }
+}

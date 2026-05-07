@@ -1,0 +1,62 @@
+{
+  "extName": {
+    "message": "TextSwap 文本替换助手",
+    "description": "Extension name shown in Chrome"
+  },
+  "extDesc": {
+    "message": "自动替换网页中的指定文本内容，后续支持图片内文字替换。",
+    "description": "Extension description shown in Chrome"
+  },
+
+  "langToggle":  { "message": "EN",           "description": "Label shown on language toggle button" },
+  "applyBtn":    { "message": "⟳ 立即应用" },
+  "subtitle":    { "message": "网页文本替换助手" },
+
+  "fromLabel":   { "message": "原文本" },
+  "fromPh":      { "message": "输入需要替换的文本" },
+  "toLabel":     { "message": "替换为" },
+  "toPh":        { "message": "输入替换后的文本" },
+
+  "advancedTitle":       { "message": "限定范围 & 替换目标" },
+  "urlScopeLabel":       { "message": "URL 范围" },
+  "urlAll":              { "message": "所有页面" },
+  "urlDomain":           { "message": "当前域名" },
+  "urlCustom":           { "message": "自定义" },
+  "urlPh":               { "message": "例：*.zhihu.com 或 toutiao.com/article/*" },
+  "domScopeLabel":       { "message": "仅在此元素内生效" },
+  "domPh":               { "message": "CSS 选择器（留空为全页面）" },
+  "pickBtn":             { "message": "⊕ 拾取" },
+  "targetLabel":         { "message": "替换目标（扩展）" },
+  "includeInputsLabel":  { "message": "输入框内容（input / textarea）" },
+  "includeEditableLabel":{ "message": "富文本编辑器（contenteditable）" },
+
+  "addBtn":      { "message": "添加规则" },
+  "clearBtn":    { "message": "清空规则" },
+  "rulesTitle":  { "message": "替换规则" },
+  "rulesEmpty":  { "message": "暂无替换规则" },
+  "countSuffix": { "message": " 条" },
+  "badgeInput":    { "message": "输入框" },
+  "badgeEditable": { "message": "富文本" },
+
+  "toastAdded":           { "message": "规则已添加" },
+  "toastDeleted":         { "message": "规则已删除" },
+  "toastCleared":         { "message": "规则已清空" },
+  "toastApplied":         { "message": "已应用到当前页面" },
+  "toastNoPage":          { "message": "无法获取当前页面" },
+  "toastNoInject":        { "message": "此页面不支持脚本注入" },
+  "toastNoPick":          { "message": "此页面不支持元素拾取" },
+  "toastNoRules":         { "message": "暂无规则可清空" },
+  "toastExists":          { "message": "该原文本规则已存在" },
+  "toastFromRequired":    { "message": "请输入原文本" },
+  "toastSelectorFilled": {
+    "message": "已填入：$SELECTOR$",
+    "placeholders": { "selector": { "content": "$1", "example": ".article-content" } }
+  },
+
+  "pickPrompt": { "message": "请点击目标元素  ·  Esc 取消" },
+  "pickDone": {
+    "message": "已选择：$SELECTOR$  ·  请重新打开插件",
+    "placeholders": { "selector": { "content": "$1" } }
+  },
+  "pickCancel": { "message": "已取消" }
+}

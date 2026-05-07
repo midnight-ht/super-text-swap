@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Restore signing key
+        # Write key.pem from secret so the CRX keeps the same extension ID.
+        # If EXTENSION_KEY_PEM is not set the build script generates a new key,
+        # but the resulting extension ID will differ from previous releases.
+        env:
+          KEY_PEM: ${{ secrets.EXTENSION_KEY_PEM }}
+        run: |
+          if [ -n "$KEY_PEM" ]; then
+            printf '%s' "$KEY_PEM" > key.pem
+            echo "Signing key restored."
+          else
+            echo "Warning: EXTENSION_KEY_PEM secret is not set. A new key will be generated."
+          fi
+
+      - name: Build
+        run: npm run build
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: TextSwap ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            text-swap-*.zip
+            text-swap-*.crx

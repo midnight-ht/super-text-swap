@@ -1,0 +1,14 @@
+{
+  "name": "text-swap-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chrome extension build toolchain",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "devDependencies": {
+    "archiver": "^6.0.1",
+    "crx": "^5.0.1",
+    "javascript-obfuscator": "^4.1.1"
+  }
+}
