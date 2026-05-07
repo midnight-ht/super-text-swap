@@ -284,6 +284,40 @@
     .empty-state { text-align: center; padding: 22px 0; color: #9ca3af; font-size: 13px; }
     .empty-icon  { font-size: 26px; margin-bottom: 6px; }
 
+    /* ── Quick actions ── */
+    .quick-actions {
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .quick-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      flex-shrink: 0;
+    }
+    .quick-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+    .btn-quick {
+      height: 26px;
+      padding: 0 11px;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      background: #f9fafb;
+      color: #374151;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .btn-quick:hover  { background: #eff6ff; border-color: #bfdbfe; color: #2563eb; }
+    .btn-quick:active { opacity: 0.8; }
+
     /* ── Toast ── */
     .toast {
       position: fixed;
@@ -442,6 +476,14 @@
     <div class="btn-row">
       <button class="btn btn-primary" id="addBtn">添加规则</button>
       <button class="btn btn-danger"  id="clearBtn">清空规则</button>
+    </div>
+  </div>
+
+  <div class="quick-actions">
+    <span class="quick-label" id="quickLabel">快捷操作</span>
+    <div class="quick-btns">
+      <button class="btn-quick" id="punctZhBtn">→ 转中文标点</button>
+      <button class="btn-quick" id="punctEnBtn">→ 转英文标点</button>
     </div>
   </div>
 

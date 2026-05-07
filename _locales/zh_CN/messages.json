@@ -62,6 +62,11 @@
 
   "toastTempApplied": { "message": "已临时应用到当前页面" },
   "toastTempFromRequired": { "message": "请先输入原文本再临时应用" },
+  "toastPunctApplied": { "message": "标点符号已转换（临时）" },
+
+  "quickLabel":  { "message": "快捷操作" },
+  "punctZhBtn":  { "message": "→ 转中文标点" },
+  "punctEnBtn":  { "message": "→ 转英文标点" },
 
   "helpTitle": { "message": "功能说明" },
   "helpClose": { "message": "关闭" },

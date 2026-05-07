@@ -62,6 +62,11 @@
 
   "toastTempApplied": { "message": "Temporarily applied to page" },
   "toastTempFromRequired": { "message": "Please enter source text before applying" },
+  "toastPunctApplied": { "message": "Punctuation converted (temporary)" },
+
+  "quickLabel":  { "message": "Quick Actions" },
+  "punctZhBtn":  { "message": "→ Chinese Punct." },
+  "punctEnBtn":  { "message": "→ English Punct." },
 
   "helpTitle": { "message": "How it works" },
   "helpClose": { "message": "Close" },

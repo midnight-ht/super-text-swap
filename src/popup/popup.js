@@ -1,3 +1,63 @@
+// ── Punctuation presets ────────────────────────────────
+// Applied as temporary rules (not saved).
+// Multi-char patterns must appear before any of their substrings.
+// ZH→EN: both left/right curly quotes collapse to the ASCII equivalent.
+// EN→ZH: straight-quote pairing requires positional state and is omitted.
+const PUNCT_PRESETS = {
+  // English/ASCII → Chinese/fullwidth
+  zh: [
+    { from: '...',  to: '……' },   // multi-char before single dot
+    { from: '--',   to: '——' },   // multi-char before single hyphen
+    { from: '(',    to: '（' },
+    { from: ')',    to: '）' },
+    { from: '[',    to: '【' },
+    { from: ']',    to: '】' },
+    { from: '{',    to: '｛' },
+    { from: '}',    to: '｝' },
+    { from: ',',    to: '，' },
+    { from: '.',    to: '。' },
+    { from: '!',    to: '！' },
+    { from: '?',    to: '？' },
+    { from: ':',    to: '：' },
+    { from: ';',    to: '；' },
+    { from: '~',    to: '～' },
+  ],
+  // Chinese/fullwidth → English/ASCII
+  en: [
+    { from: '……',   to: '...' },  // double ellipsis
+    { from: '…', to: '...' },// single Unicode ellipsis …
+    { from: '——',   to: '--' },
+    { from: '—',    to: '-' },
+    { from: '－',   to: '-' },    // fullwidth hyphen-minus
+    { from: '“', to: '"' }, // " left double quotation mark
+    { from: '”', to: '"' }, // " right double quotation mark
+    { from: '‘', to: '\'' },// ‘ left single quotation mark
+    { from: '’', to: '\'' },// ’ right single / apostrophe
+    { from: '「',   to: '"' },   // CJK left corner bracket
+    { from: '」',   to: '"' },
+    { from: '『',   to: '\'' },  // CJK left white corner bracket
+    { from: '』',   to: '\'' },
+    { from: '（',   to: '(' },
+    { from: '）',   to: ')' },
+    { from: '【',   to: '[' },
+    { from: '】',   to: ']' },
+    { from: '｛',   to: '{' },
+    { from: '｝',   to: '}' },
+    { from: '〔',   to: '[' },
+    { from: '〕',   to: ']' },
+    { from: '〈',   to: '<' },
+    { from: '〉',   to: '>' },
+    { from: '，',   to: ',' },
+    { from: '。',   to: '.' },
+    { from: '！',   to: '!' },
+    { from: '？',   to: '?' },
+    { from: '：',   to: ':' },
+    { from: '；',   to: ';' },
+    { from: '、',   to: ',' },   // enumeration comma
+    { from: '～',   to: '~' },
+  ],
+};
+
 // ── i18n ──────────────────────────────────────────────
 // Strings are defined in _locales/{locale}/messages.json.
 // We load via fetch so the in-popup toggle can override the browser locale.
@@ -80,6 +140,9 @@ function applyTranslations() {
   setText('addBtn',               'addBtn');
   setText('clearBtn',             'clearBtn');
   setText('rulesTitle',           'rulesTitle');
+  setText('quickLabel',           'quickLabel');
+  setText('punctZhBtn',           'punctZhBtn');
+  setText('punctEnBtn',           'punctEnBtn');
   setText('helpTitle',            'helpTitle');
   setText('helpClose',            'helpClose');
 
@@ -174,6 +237,38 @@ q('pickBtn').addEventListener('click', async () => {
   }
   window.close();
 });
+
+// ── Punctuation preset apply ───────────────────────────
+async function applyPunctPreset(type) {
+  const scope = readScopeFromForm();   // respect current URL / DOM / target settings
+  const rules = PUNCT_PRESETS[type].map((pair, i) => ({
+    id: `__punct_${type}_${i}__`,
+    from: pair.from,
+    to: pair.to,
+    type: 'plain',
+    enabled: true,
+    scope,
+  }));
+
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) { showToast(t('toastNoPage')); return; }
+
+  const sendTemp = () =>
+    chrome.tabs.sendMessage(tab.id, { type: 'TEXT_SWAP_APPLY_TEMP', rules });
+
+  try {
+    await sendTemp();
+    showToast(t('toastPunctApplied'));
+  } catch {
+    try {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['src/content/content.js'] });
+      await sendTemp();
+      showToast(t('toastPunctApplied'));
+    } catch {
+      showToast(t('toastNoInject'));
+    }
+  }
+}
 
 // ── Apply Now — TEMPORARY (does not save to rules) ────
 // Reads current form inputs + scope, applies once to the page.
@@ -326,9 +421,11 @@ async function clearRules() {
 }
 
 // ── Event listeners ────────────────────────────────────
-q('addBtn').addEventListener('click',   addRule);
-q('clearBtn').addEventListener('click', clearRules);
-q('applyBtn').addEventListener('click', applyTemp);           // ← temporary apply
+q('addBtn').addEventListener('click',    addRule);
+q('clearBtn').addEventListener('click',  clearRules);
+q('applyBtn').addEventListener('click',  applyTemp);
+q('punctZhBtn').addEventListener('click', () => applyPunctPreset('zh'));
+q('punctEnBtn').addEventListener('click', () => applyPunctPreset('en'));
 q('langToggleBtn').addEventListener('click', toggleLang);
 fromInput.addEventListener('keydown', e => { if (e.key === 'Enter') toInput.focus(); });
 toInput.addEventListener('keydown',   e => { if (e.key === 'Enter') addRule(); });
