@@ -337,6 +337,85 @@ function applyTempRules(tempRules) {
   }
 }
 
+// ── Stateful quote parser for EN→ZH conversion ────────
+// Tracks open/close parity across text nodes so "hello" "world"
+// pairs correctly even when the quotes span multiple DOM elements.
+// ASCII " toggles between U+201C (open) and U+201D (close).
+// ASCII ' between two word chars becomes U+2019 (apostrophe);
+// otherwise toggles between U+2018 (open) and U+2019 (close).
+function applyZhQuoteParser(scope) {
+  let dq = false; // false = next " is opening U+201C
+  let sq = false; // false = next ' is opening U+2018
+
+  function parseText(text) {
+    if (text.indexOf('"') === -1 && text.indexOf("'") === -1) return text;
+    let out = '';
+    for (let i = 0; i < text.length; i++) {
+      const ch   = text[i];
+      const prev = i > 0               ? text[i - 1] : '\n';
+      const next = i < text.length - 1 ? text[i + 1] : '\n';
+      if (ch === '"') {
+        out += dq ? '”' : '“';
+        dq = !dq;
+      } else if (ch === "'") {
+        if (/\w/.test(prev) && /\w/.test(next)) {
+          out += '’'; // typographic apostrophe — don't toggle parity
+        } else {
+          out += sq ? '’' : '‘';
+          sq = !sq;
+        }
+      } else {
+        out += ch;
+      }
+    }
+    return out;
+  }
+
+  // Walk text nodes; state persists across nodes for correct cross-element pairing
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const el = node.parentElement;
+      if (!el) return NodeFilter.FILTER_REJECT;
+      if (SKIP_TAGS.has(el.tagName)) return NodeFilter.FILTER_REJECT;
+      if (el.isContentEditable && !scope?.includeEditable) return NodeFilter.FILTER_REJECT;
+      if (scope?.domSelector) {
+        try {
+          if (!el.closest(scope.domSelector)) return NodeFilter.FILTER_REJECT;
+        } catch { return NodeFilter.FILTER_REJECT; }
+      }
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+
+  let node;
+  while ((node = walker.nextNode())) {
+    const original = node.nodeValue;
+    if (!original) continue;
+    const result = parseText(original);
+    if (result !== original) node.nodeValue = result;
+  }
+
+  // Input/textarea: fresh state per element (quotes don't span multiple fields)
+  if (scope?.includeInputs) {
+    const sel = 'input[type="text"],input[type="search"],input[type="email"],' +
+                'input[type="url"],input:not([type]),textarea';
+    document.querySelectorAll(sel).forEach(el => {
+      const v = el.value;
+      if (!v || (v.indexOf('"') === -1 && v.indexOf("'") === -1)) return;
+      let d = false, s = false, out = '';
+      for (let i = 0; i < v.length; i++) {
+        const ch = v[i], prev = i > 0 ? v[i-1] : '\n', next = i < v.length-1 ? v[i+1] : '\n';
+        if (ch === '"') { out += d ? '”' : '“'; d = !d; }
+        else if (ch === "'") {
+          if (/\w/.test(prev) && /\w/.test(next)) out += '’';
+          else { out += s ? '’' : '‘'; s = !s; }
+        } else { out += ch; }
+      }
+      if (out !== v) el.value = out;
+    });
+  }
+}
+
 // ── Message listener ───────────────────────────────────
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === 'TEXT_SWAP_RULES_UPDATED') refresh();
@@ -344,6 +423,10 @@ chrome.runtime.onMessage.addListener((message) => {
     loadRules().then(enterPickMode);
   if (message.type === 'TEXT_SWAP_APPLY_TEMP')
     applyTempRules(message.rules);
+  if (message.type === 'TEXT_SWAP_APPLY_PUNCT') {
+    applyTempRules(message.rules); // simple rules first (brackets, punctuation)
+    if (message.direction === 'zh') applyZhQuoteParser(message.scope);
+  }
 });
 
 refresh();

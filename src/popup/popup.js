@@ -1,60 +1,64 @@
 // ── Punctuation presets ────────────────────────────────
 // Applied as temporary rules (not saved).
-// Multi-char patterns must appear before any of their substrings.
-// ZH→EN: both left/right curly quotes collapse to the ASCII equivalent.
-// EN→ZH: straight-quote pairing requires positional state and is omitted.
+// zh: non-quote rules only; " and ' pairing handled by applyZhQuoteParser in content.js.
+// en: all Chinese/fullwidth punctuation collapsed to ASCII equivalents.
+// All non-ASCII in string values use \u escapes to avoid encoding-normalization issues.
 const PUNCT_PRESETS = {
-  // English/ASCII → Chinese/fullwidth
   zh: [
-    { from: '...',  to: '……' },   // multi-char before single dot
-    { from: '--',   to: '——' },   // multi-char before single hyphen
-    { from: '(',    to: '（' },
-    { from: ')',    to: '）' },
-    { from: '[',    to: '【' },
-    { from: ']',    to: '】' },
-    { from: '{',    to: '｛' },
-    { from: '}',    to: '｝' },
-    { from: ',',    to: '，' },
-    { from: '.',    to: '。' },
-    { from: '!',    to: '！' },
-    { from: '?',    to: '？' },
-    { from: ':',    to: '：' },
-    { from: ';',    to: '；' },
-    { from: '~',    to: '～' },
+    { from: '...', to: '……' }, // ... -> ……
+    { from: '--',  to: '——' }, // -- -> ——
+    { from: '(',   to: '（' },        // ( -> （
+    { from: ')',   to: '）' },        // ) -> ）
+    { from: '[',   to: '【' },        // [ -> 【
+    { from: ']',   to: '】' },        // ] -> 】
+    { from: '{',   to: '｛' },        // { -> ｛
+    { from: '}',   to: '｝' },        // } -> ｝
+    { from: '<',   to: '〈' },        // < -> 〈
+    { from: '>',   to: '〉' },        // > -> 〉
+    { from: ',',   to: '，' },        // , -> ，
+    { from: '.',   to: '。' },        // . -> 。
+    { from: '!',   to: '！' },        // ! -> ！
+    { from: '?',   to: '？' },        // ? -> ？
+    { from: ':',   to: '：' },        // : -> ：
+    { from: ';',   to: '；' },        // ; -> ；
+    { from: '~',   to: '～' },        // ~ -> ～
   ],
-  // Chinese/fullwidth → English/ASCII
   en: [
-    { from: '……',   to: '...' },  // double ellipsis
-    { from: '…', to: '...' },// single Unicode ellipsis …
-    { from: '——',   to: '--' },
-    { from: '—',    to: '-' },
-    { from: '－',   to: '-' },    // fullwidth hyphen-minus
-    { from: '“', to: '"' }, // " left double quotation mark
-    { from: '”', to: '"' }, // " right double quotation mark
-    { from: '‘', to: '\'' },// ‘ left single quotation mark
-    { from: '’', to: '\'' },// ’ right single / apostrophe
-    { from: '「',   to: '"' },   // CJK left corner bracket
-    { from: '」',   to: '"' },
-    { from: '『',   to: '\'' },  // CJK left white corner bracket
-    { from: '』',   to: '\'' },
-    { from: '（',   to: '(' },
-    { from: '）',   to: ')' },
-    { from: '【',   to: '[' },
-    { from: '】',   to: ']' },
-    { from: '｛',   to: '{' },
-    { from: '｝',   to: '}' },
-    { from: '〔',   to: '[' },
-    { from: '〕',   to: ']' },
-    { from: '〈',   to: '<' },
-    { from: '〉',   to: '>' },
-    { from: '，',   to: ',' },
-    { from: '。',   to: '.' },
-    { from: '！',   to: '!' },
-    { from: '？',   to: '?' },
-    { from: '：',   to: ':' },
-    { from: '；',   to: ';' },
-    { from: '、',   to: ',' },   // enumeration comma
-    { from: '～',   to: '~' },
+    { from: '……', to: '...' },  // …… -> ...
+    { from: '…',       to: '...' },  // … -> ...
+    { from: '——', to: '--'  },  // —— -> --
+    { from: '—',       to: '-'   },  // — -> -
+    { from: '－',       to: '-'   },  // － -> -
+    { from: '“',       to: '"'   },  // " -> "
+    { from: '”',       to: '"'   },  // " -> "
+    { from: '‘',       to: '\''  },  // ' -> '
+    { from: '’',       to: '\''  },  // ' -> '
+    { from: '「',       to: '"'   },  // 「 -> "
+    { from: '」',       to: '"'   },  // 」 -> "
+    { from: '『',       to: '\''  },  // 『 -> '
+    { from: '』',       to: '\''  },  // 』 -> '
+    { from: '《',       to: '<<'  },  // 《 -> <<
+    { from: '》',       to: '>>'  },  // 》 -> >>
+    { from: '〈',       to: '<'   },  // 〈 -> <
+    { from: '〉',       to: '>'   },  // 〉 -> >
+    { from: '〔',       to: '['   },  // 〔 -> [
+    { from: '〕',       to: ']'   },  // 〕 -> ]
+    { from: '（',       to: '('   },  // （ -> (
+    { from: '）',       to: ')'   },  // ） -> )
+    { from: '【',       to: '['   },  // 【 -> [
+    { from: '】',       to: ']'   },  // 】 -> ]
+    { from: '｛',       to: '{'   },  // ｛ -> {
+    { from: '｝',       to: '}'   },  // ｝ -> }
+    { from: '，',       to: ','   },  // ， -> ,
+    { from: '。',       to: '.'   },  // 。 -> .
+    { from: '！',       to: '!'   },  // ！ -> !
+    { from: '？',       to: '?'   },  // ？ -> ?
+    { from: '：',       to: ':'   },  // ： -> :
+    { from: '；',       to: ';'   },  // ； -> ;
+    { from: '、',       to: ','   },  // 、 -> ,
+    { from: '～',       to: '~'   },  // ～ -> ~
+    { from: '・',       to: '.'   },  // ・ -> .
+    { from: '　',       to: ' '   },  // ideographic space -> space
   ],
 };
 
@@ -78,7 +82,6 @@ function t(key, sub) {
 
 // ── State ──────────────────────────────────────────────
 let rules = [];
-let lang_current = 'zh_CN';
 let currentHostname = '';
 
 // ── DOM refs ───────────────────────────────────────────
@@ -147,7 +150,6 @@ function applyTranslations() {
   setText('helpClose',            'helpClose');
 
   renderRules();
-  // Refresh help body if modal is open
   if (q('helpModal').classList.contains('open')) renderHelpBody();
 }
 
@@ -188,10 +190,7 @@ function renderHelpBody() {
   `).join('');
 }
 
-function openHelp()  {
-  renderHelpBody();
-  q('helpModal').classList.add('open');
-}
+function openHelp()  { renderHelpBody(); q('helpModal').classList.add('open'); }
 function closeHelp() { q('helpModal').classList.remove('open'); }
 
 q('helpBtn').addEventListener('click', openHelp);
@@ -239,10 +238,13 @@ q('pickBtn').addEventListener('click', async () => {
 });
 
 // ── Punctuation preset apply ───────────────────────────
+// Sends TEXT_SWAP_APPLY_PUNCT so content.js can:
+//   - apply simple rules via applyTempRules
+//   - run applyZhQuoteParser for stateful " ' pairing (zh direction only)
 async function applyPunctPreset(type) {
-  const scope = readScopeFromForm();   // respect current URL / DOM / target settings
+  const scope = readScopeFromForm();
   const rules = PUNCT_PRESETS[type].map((pair, i) => ({
-    id: `__punct_${type}_${i}__`,
+    id: '__punct_' + type + '_' + i + '__',
     from: pair.from,
     to: pair.to,
     type: 'plain',
@@ -253,16 +255,16 @@ async function applyPunctPreset(type) {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) { showToast(t('toastNoPage')); return; }
 
-  const sendTemp = () =>
-    chrome.tabs.sendMessage(tab.id, { type: 'TEXT_SWAP_APPLY_TEMP', rules });
+  const sendMsg = () =>
+    chrome.tabs.sendMessage(tab.id, { type: 'TEXT_SWAP_APPLY_PUNCT', direction: type, rules, scope });
 
   try {
-    await sendTemp();
+    await sendMsg();
     showToast(t('toastPunctApplied'));
   } catch {
     try {
       await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['src/content/content.js'] });
-      await sendTemp();
+      await sendMsg();
       showToast(t('toastPunctApplied'));
     } catch {
       showToast(t('toastNoInject'));
@@ -279,7 +281,6 @@ async function applyTemp() {
 
   const to    = toInput.value.trim();
   const scope = readScopeFromForm();
-
   const tempRule = { id: '__temp__', from, to, type: 'plain', enabled: true, scope };
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -323,7 +324,7 @@ function renderRules() {
   if (rules.length === 0) {
     rulesList.innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">📝</div>
+        <div class="empty-icon">&#x1F4DD;</div>
         <div>${t('rulesEmpty')}</div>
       </div>`;
     return;
@@ -332,9 +333,9 @@ function renderRules() {
     <div class="rule-item">
       <div class="rule-main">
         <span class="rule-from" title="${escapeHtml(rule.from)}">${escapeHtml(rule.from)}</span>
-        <span class="rule-arrow">→</span>
+        <span class="rule-arrow">&#x2192;</span>
         <span class="rule-to"   title="${escapeHtml(rule.to)}">${escapeHtml(rule.to)}</span>
-        <button class="rule-delete" data-index="${index}">×</button>
+        <button class="rule-delete" data-index="${index}">&#xD7;</button>
       </div>
       ${getScopeBadgesHtml(rule)}
     </div>
@@ -375,7 +376,6 @@ function resetForm() {
 
 async function saveRules() { await chrome.storage.sync.set({ rules }); }
 
-// Notify content script to re-apply saved rules (used after add/delete/clear)
 async function notifyPageRefresh() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) return;
@@ -421,9 +421,9 @@ async function clearRules() {
 }
 
 // ── Event listeners ────────────────────────────────────
-q('addBtn').addEventListener('click',    addRule);
-q('clearBtn').addEventListener('click',  clearRules);
-q('applyBtn').addEventListener('click',  applyTemp);
+q('addBtn').addEventListener('click',     addRule);
+q('clearBtn').addEventListener('click',   clearRules);
+q('applyBtn').addEventListener('click',   applyTemp);
 q('punctZhBtn').addEventListener('click', () => applyPunctPreset('zh'));
 q('punctEnBtn').addEventListener('click', () => applyPunctPreset('en'));
 q('langToggleBtn').addEventListener('click', toggleLang);
