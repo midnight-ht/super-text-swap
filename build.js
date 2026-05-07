@@ -29,12 +29,16 @@ const ZIP_NAME = `text-swap-v${pkg.version}.zip`;
 const CRX_NAME = `text-swap-v${pkg.version}.crx`;
 const KEY_FILE = path.join(ROOT, 'key.pem');
 
-// ── Files / dirs excluded from the build output ────────
-const EXCLUDE = new Set([
-  'node_modules', 'dist', '.git', '.claude',
-  'docs', 'build.js', 'package.json', 'package-lock.json', '.gitignore',
-  ZIP_NAME, CRX_NAME, 'key.pem',
-]);
+// ── Whitelist: only these entries are included in dist ─
+// Using a whitelist avoids accidentally packing docs, .venv,
+// .github, README files, or any other project-level file.
+const INCLUDE = [
+  'manifest.json',
+  'src',
+  'icons',
+  '_locales',
+  'LICENSE',
+];
 
 // ── Obfuscation settings ────────────────────────────────
 // renameGlobals must stay false — chrome.* APIs are referenced by name.
@@ -99,10 +103,11 @@ function processFile(srcPath, destPath) {
   }
 }
 
+// processDir walks a directory recursively; no filtering needed
+// because we only call it on whitelisted paths.
 function processDir(srcDir, destDir) {
   fs.mkdirSync(destDir, { recursive: true });
   for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
-    if (EXCLUDE.has(entry.name)) continue;
     const src  = path.join(srcDir, entry.name);
     const dest = path.join(destDir, entry.name);
     entry.isDirectory() ? processDir(src, dest) : processFile(src, dest);
@@ -170,7 +175,12 @@ async function createCrx() {
   try {
     clean();
     console.log('');
-    processDir(ROOT, DIST);
+    for (const name of INCLUDE) {
+      const src  = path.join(ROOT, name);
+      const dest = path.join(DIST, name);
+      if (!fs.existsSync(src)) { log('skip', `${name} not found`); continue; }
+      fs.statSync(src).isDirectory() ? processDir(src, dest) : processFile(src, dest);
+    }
     console.log('');
     await createZip();
     await createCrx();

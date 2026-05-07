@@ -58,5 +58,26 @@
     "message": "Selected: $SELECTOR$  ·  Reopen the extension popup",
     "placeholders": { "selector": { "content": "$1" } }
   },
-  "pickCancel": { "message": "Cancelled" }
+  "pickCancel": { "message": "Cancelled" },
+
+  "toastTempApplied": { "message": "Temporarily applied to page" },
+  "toastTempFromRequired": { "message": "Please enter source text before applying" },
+
+  "helpTitle": { "message": "How it works" },
+  "helpClose": { "message": "Close" },
+
+  "helpS1Title": { "message": "Add Rule (Persistent)" },
+  "helpS1Desc":  { "message": "Saved to local storage and applied automatically on every page load. Rules survive browser restarts." },
+
+  "helpS2Title": { "message": "Apply Now (Temporary)" },
+  "helpS2Desc":  { "message": "Applies the current From / To inputs and scope settings to the page immediately without saving. Resets when the page refreshes." },
+
+  "helpS3Title": { "message": "Scope (URL / DOM Element)" },
+  "helpS3Desc":  { "message": "URL Scope: controls which pages the rule applies to.\nLimit to element: only replaces text within a CSS selector. Use ⊕ Pick to select the element visually." },
+
+  "helpS4Title": { "message": "Extra Targets" },
+  "helpS4Desc":  { "message": "By default only visible text nodes are replaced.\nEnable Input fields to also replace input / textarea values; enable Rich text to also replace contenteditable editor content." },
+
+  "helpS5Title": { "message": "Rule List" },
+  "helpS5Desc":  { "message": "Saved rules run in order. Click × to delete one, Clear All to remove all. Colored badges indicate a rule has URL or element scope restrictions." }
 }

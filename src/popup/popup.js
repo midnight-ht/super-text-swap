@@ -1,18 +1,15 @@
 // ── i18n ──────────────────────────────────────────────
-// All strings live in _locales/{locale}/messages.json.
-// We load the file manually so the in-popup language toggle
-// can override the browser's own locale at runtime.
+// Strings are defined in _locales/{locale}/messages.json.
+// We load via fetch so the in-popup toggle can override the browser locale.
 
 let messages = {};
 let lang = 'zh_CN';
 
 async function loadMessages(locale) {
   const url = chrome.runtime.getURL(`_locales/${locale}/messages.json`);
-  const res  = await fetch(url);
-  messages   = await res.json();
+  messages  = await (await fetch(url)).json();
 }
 
-// Substitute a single positional value into $PLACEHOLDER$ slots
 function t(key, sub) {
   let str = messages[key]?.message ?? key;
   if (sub !== undefined) str = str.replace(/\$[A-Z_]+\$/g, sub);
@@ -21,6 +18,7 @@ function t(key, sub) {
 
 // ── State ──────────────────────────────────────────────
 let rules = [];
+let lang_current = 'zh_CN';
 let currentHostname = '';
 
 // ── DOM refs ───────────────────────────────────────────
@@ -57,48 +55,43 @@ function escapeHtml(str) {
 
 // ── Apply translations to DOM ──────────────────────────
 function applyTranslations() {
-  const setText = (id, key, sub) => {
-    const el = q(id);
-    if (el) el.textContent = t(key, sub);
-  };
-  const setPh = (id, key) => {
-    const el = q(id);
-    if (el) el.placeholder = t(key);
-  };
+  const setText = (id, key, sub) => { const el = q(id); if (el) el.textContent = t(key, sub); };
+  const setPh   = (id, key)      => { const el = q(id); if (el) el.placeholder  = t(key); };
 
-  setText('langToggleBtn',       'langToggle');
-  setText('applyBtn',            'applyBtn');
-  setText('headerSubtitle',      'subtitle');
-  setText('fromLabel',           'fromLabel');
-  setPh  ('fromInput',           'fromPh');
-  setText('toLabel',             'toLabel');
-  setPh  ('toInput',             'toPh');
-  setText('advancedToggleText',  'advancedTitle');
-  setText('urlScopeLabel',       'urlScopeLabel');
-  setText('urlAll',              'urlAll');
-  setText('urlDomainText',       'urlDomain');
-  setText('urlCustomText',       'urlCustom');
-  setPh  ('urlPatternInput',     'urlPh');
-  setText('domScopeLabel',       'domScopeLabel');
-  setPh  ('domSelectorInput',    'domPh');
-  setText('pickBtn',             'pickBtn');
-  setText('targetLabel',         'targetLabel');
-  setText('includeInputsLabel',  'includeInputsLabel');
-  setText('includeEditableLabel','includeEditableLabel');
-  setText('addBtn',              'addBtn');
-  setText('clearBtn',            'clearBtn');
-  setText('rulesTitle',          'rulesTitle');
+  setText('langToggleBtn',        'langToggle');
+  setText('applyBtn',             'applyBtn');
+  setText('headerSubtitle',       'subtitle');
+  setText('fromLabel',            'fromLabel');
+  setPh  ('fromInput',            'fromPh');
+  setText('toLabel',              'toLabel');
+  setPh  ('toInput',              'toPh');
+  setText('advancedToggleText',   'advancedTitle');
+  setText('urlScopeLabel',        'urlScopeLabel');
+  setText('urlAll',               'urlAll');
+  setText('urlDomainText',        'urlDomain');
+  setText('urlCustomText',        'urlCustom');
+  setPh  ('urlPatternInput',      'urlPh');
+  setText('domScopeLabel',        'domScopeLabel');
+  setPh  ('domSelectorInput',     'domPh');
+  setText('pickBtn',              'pickBtn');
+  setText('targetLabel',          'targetLabel');
+  setText('includeInputsLabel',   'includeInputsLabel');
+  setText('includeEditableLabel', 'includeEditableLabel');
+  setText('addBtn',               'addBtn');
+  setText('clearBtn',             'clearBtn');
+  setText('rulesTitle',           'rulesTitle');
+  setText('helpTitle',            'helpTitle');
+  setText('helpClose',            'helpClose');
 
   renderRules();
+  // Refresh help body if modal is open
+  if (q('helpModal').classList.contains('open')) renderHelpBody();
 }
 
 // ── Language toggle ────────────────────────────────────
 async function toggleLang() {
   lang = lang === 'zh_CN' ? 'en' : 'zh_CN';
-  await Promise.all([
-    chrome.storage.local.set({ lang }),
-    loadMessages(lang),
-  ]);
+  await Promise.all([chrome.storage.local.set({ lang }), loadMessages(lang)]);
   applyTranslations();
 }
 
@@ -114,6 +107,33 @@ document.querySelectorAll('input[name="urlMode"]').forEach(radio => {
     customUrlRow.style.display = mode === 'custom' ? 'block' : 'none';
   });
 });
+
+// ── Help modal ─────────────────────────────────────────
+function renderHelpBody() {
+  const sections = [
+    ['helpS1Title', 'helpS1Desc'],
+    ['helpS2Title', 'helpS2Desc'],
+    ['helpS3Title', 'helpS3Desc'],
+    ['helpS4Title', 'helpS4Desc'],
+    ['helpS5Title', 'helpS5Desc'],
+  ];
+  q('helpBody').innerHTML = sections.map(([tk, dk]) => `
+    <div class="help-section">
+      <div class="help-section-title">${escapeHtml(t(tk))}</div>
+      <div class="help-section-desc">${escapeHtml(t(dk)).replace(/\n/g, '<br>')}</div>
+    </div>
+  `).join('');
+}
+
+function openHelp()  {
+  renderHelpBody();
+  q('helpModal').classList.add('open');
+}
+function closeHelp() { q('helpModal').classList.remove('open'); }
+
+q('helpBtn').addEventListener('click', openHelp);
+q('helpClose').addEventListener('click', closeHelp);
+q('helpModal').addEventListener('click', e => { if (e.target === q('helpModal')) closeHelp(); });
 
 // ── Current tab hostname ───────────────────────────────
 chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
@@ -139,44 +159,48 @@ async function checkPendingSelector() {
 q('pickBtn').addEventListener('click', async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) { showToast(t('toastNoPage')); return; }
-
   const sendPick = () =>
     chrome.tabs.sendMessage(tab.id, { type: 'TEXT_SWAP_PICK_START' });
-
   try {
     await sendPick();
   } catch {
-    // Content script not yet injected (tab opened before extension loaded).
-    // Inject it first, then retry the message.
     try {
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        files: ['src/content/content.js'],
-      });
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['src/content/content.js'] });
       await sendPick();
     } catch {
       showToast(t('toastNoPick'));
       return;
     }
   }
-
   window.close();
 });
 
-// ── Apply to current tab ───────────────────────────────
-async function applyToCurrentTab() {
+// ── Apply Now — TEMPORARY (does not save to rules) ────
+// Reads current form inputs + scope, applies once to the page.
+// The effect resets on page refresh.
+async function applyTemp() {
+  const from = fromInput.value.trim();
+  if (!from) { showToast(t('toastTempFromRequired')); fromInput.focus(); return; }
+
+  const to    = toInput.value.trim();
+  const scope = readScopeFromForm();
+
+  const tempRule = { id: '__temp__', from, to, type: 'plain', enabled: true, scope };
+
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) { showToast(t('toastNoPage')); return; }
+
+  const sendTemp = () =>
+    chrome.tabs.sendMessage(tab.id, { type: 'TEXT_SWAP_APPLY_TEMP', rules: [tempRule] });
+
   try {
-    await chrome.tabs.sendMessage(tab.id, { type: 'TEXT_SWAP_RULES_UPDATED' });
-    showToast(t('toastApplied'));
+    await sendTemp();
+    showToast(t('toastTempApplied'));
   } catch {
     try {
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        files: ['src/content/content.js'],
-      });
-      showToast(t('toastApplied'));
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['src/content/content.js'] });
+      await sendTemp();
+      showToast(t('toastTempApplied'));
     } catch {
       showToast(t('toastNoInject'));
     }
@@ -201,7 +225,6 @@ function getScopeBadgesHtml(rule) {
 
 function renderRules() {
   rulesCount.textContent = `${rules.length}${t('countSuffix')}`;
-
   if (rules.length === 0) {
     rulesList.innerHTML = `
       <div class="empty-state">
@@ -210,7 +233,6 @@ function renderRules() {
       </div>`;
     return;
   }
-
   rulesList.innerHTML = rules.map((rule, index) => `
     <div class="rule-item">
       <div class="rule-main">
@@ -222,7 +244,6 @@ function renderRules() {
       ${getScopeBadgesHtml(rule)}
     </div>
   `).join('');
-
   rulesList.querySelectorAll('.rule-delete').forEach(btn => {
     btn.addEventListener('click', e => deleteRule(parseInt(e.target.dataset.index, 10)));
   });
@@ -238,12 +259,10 @@ function readScopeFromForm() {
   let urlPattern = '';
   if (urlMode === 'domain')      urlPattern = currentHostname;
   else if (urlMode === 'custom') urlPattern = urlPatternInput.value.trim();
-
   const domSelector     = domSelectorInput.value.trim();
   const includeInputs   = includeInputsCb.checked;
   const includeEditable = includeEditableCb.checked;
   const hasScope = urlMode !== 'all' || domSelector || includeInputs || includeEditable;
-
   return hasScope ? { urlMode, urlPattern, domSelector, includeInputs, includeEditable } : null;
 }
 
@@ -259,8 +278,19 @@ function resetForm() {
   fromInput.focus();
 }
 
-async function saveRules() {
-  await chrome.storage.sync.set({ rules });
+async function saveRules() { await chrome.storage.sync.set({ rules }); }
+
+// Notify content script to re-apply saved rules (used after add/delete/clear)
+async function notifyPageRefresh() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) return;
+  try {
+    await chrome.tabs.sendMessage(tab.id, { type: 'TEXT_SWAP_RULES_UPDATED' });
+  } catch {
+    try {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['src/content/content.js'] });
+    } catch {}
+  }
 }
 
 async function addRule() {
@@ -268,17 +298,14 @@ async function addRule() {
   const to   = toInput.value.trim();
   if (!from) { showToast(t('toastFromRequired')); fromInput.focus(); return; }
   if (rules.find(r => r.from === from)) { showToast(t('toastExists')); return; }
-
   const now = Date.now();
-  rules.push({
-    id: generateId(), from, to, type: 'plain', enabled: true,
-    scope: readScopeFromForm(), createdAt: now, updatedAt: now,
-  });
+  rules.push({ id: generateId(), from, to, type: 'plain', enabled: true,
+               scope: readScopeFromForm(), createdAt: now, updatedAt: now });
   await saveRules();
   renderRules();
   resetForm();
   showToast(t('toastAdded'));
-  applyToCurrentTab();
+  notifyPageRefresh();
 }
 
 async function deleteRule(index) {
@@ -286,7 +313,7 @@ async function deleteRule(index) {
   await saveRules();
   renderRules();
   showToast(t('toastDeleted'));
-  applyToCurrentTab();
+  notifyPageRefresh();
 }
 
 async function clearRules() {
@@ -295,13 +322,13 @@ async function clearRules() {
   await saveRules();
   renderRules();
   showToast(t('toastCleared'));
-  applyToCurrentTab();
+  notifyPageRefresh();
 }
 
 // ── Event listeners ────────────────────────────────────
-q('addBtn').addEventListener('click', addRule);
+q('addBtn').addEventListener('click',   addRule);
 q('clearBtn').addEventListener('click', clearRules);
-q('applyBtn').addEventListener('click', applyToCurrentTab);
+q('applyBtn').addEventListener('click', applyTemp);           // ← temporary apply
 q('langToggleBtn').addEventListener('click', toggleLang);
 fromInput.addEventListener('keydown', e => { if (e.key === 'Enter') toInput.focus(); });
 toInput.addEventListener('keydown',   e => { if (e.key === 'Enter') addRule(); });
@@ -314,7 +341,6 @@ toInput.addEventListener('keydown',   e => { if (e.key === 'Enter') addRule(); }
   ]);
   rules = syncResult.rules || [];
   lang  = localResult.lang || 'zh_CN';
-
   await loadMessages(lang);
   applyTranslations();
   await checkPendingSelector();

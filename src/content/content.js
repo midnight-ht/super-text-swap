@@ -287,11 +287,63 @@ async function exitPickMode(selector) {
   }
 }
 
+// ── Temporary apply (one-shot, not saved) ─────────────
+// Applies caller-supplied rules directly to the current page state.
+// Does not touch currentRules or processedMark, so a subsequent
+// refresh() will restore the page to saved-rules-only state.
+function applyTempRules(tempRules) {
+  if (!tempRules?.length) return;
+  const active = tempRules.filter(r => r.enabled && r.from && matchesCurrentUrl(r));
+  if (!active.length) return;
+
+  // Regular text nodes
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+    acceptNode: node =>
+      shouldSkipNode(node) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+  });
+  let node;
+  while ((node = walker.nextNode())) {
+    const original = node.nodeValue;
+    if (!original || !original.trim()) continue;
+    const replaced = applyRules(original, node.parentElement, active);
+    if (replaced !== original) node.nodeValue = replaced;
+  }
+
+  // Input / textarea
+  const inputRules = active.filter(r => r.scope?.includeInputs);
+  if (inputRules.length) {
+    const sel = 'input[type="text"],input[type="search"],input[type="email"],' +
+                'input[type="url"],input:not([type]),textarea';
+    document.querySelectorAll(sel).forEach(el => {
+      if (!el.value) return;
+      const replaced = applyRules(el.value, el, inputRules);
+      if (replaced !== el.value) el.value = replaced;
+    });
+  }
+
+  // Contenteditable
+  const editableRules = active.filter(r => r.scope?.includeEditable);
+  if (editableRules.length) {
+    document.querySelectorAll('[contenteditable="true"]').forEach(editable => {
+      const w = document.createTreeWalker(editable, NodeFilter.SHOW_TEXT);
+      let n;
+      while ((n = w.nextNode())) {
+        const original = n.nodeValue;
+        if (!original || !original.trim()) continue;
+        const replaced = applyRules(original, n.parentElement, editableRules);
+        if (replaced !== original) n.nodeValue = replaced;
+      }
+    });
+  }
+}
+
 // ── Message listener ───────────────────────────────────
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === 'TEXT_SWAP_RULES_UPDATED') refresh();
   if (message.type === 'TEXT_SWAP_PICK_START')
-    loadRules().then(enterPickMode); // ensure uiLang is loaded before showing toast
+    loadRules().then(enterPickMode);
+  if (message.type === 'TEXT_SWAP_APPLY_TEMP')
+    applyTempRules(message.rules);
 });
 
 refresh();
