@@ -8,6 +8,34 @@ const SKIP_TAGS = new Set([
   'TEXTAREA', 'INPUT', 'CODE', 'PRE', 'SELECT', 'OPTION',
 ]);
 
+// Context-aware replacement for punctuation presets.
+// Protects patterns like domain.com, file.txt, 3.14, 1,000, http://
+function smartReplace(text, from, to) {
+  switch (from) {
+    case '.':
+      // Skip when dot is between alphanumeric chars: domain.com, file.txt, 3.14
+      return text.replace(/\./g, (m, i, s) => {
+        const prev = i > 0 ? s[i - 1] : '';
+        const next = i < s.length - 1 ? s[i + 1] : '';
+        return /[a-zA-Z0-9]/.test(prev) && /[a-zA-Z0-9]/.test(next) ? m : to;
+      });
+    case ',':
+      // Skip when comma is between digits: 1,000,000
+      return text.replace(/,/g, (m, i, s) => {
+        const prev = i > 0 ? s[i - 1] : '';
+        const next = i < s.length - 1 ? s[i + 1] : '';
+        return /\d/.test(prev) && /\d/.test(next) ? m : to;
+      });
+    case ':':
+      // Skip in URL protocols: http:// https:// ftp://
+      return text.replace(/:/g, (m, i, s) =>
+        s.slice(i + 1, i + 3) === '//' ? m : to
+      );
+    default:
+      return text.split(from).join(to);
+  }
+}
+
 // ── i18n: load pick-mode strings from _locales ─────────
 let uiMessages = {};
 
@@ -24,7 +52,6 @@ const msg = (key, sub) => {
   let str = uiMessages[key]?.message ?? key;
   if (sub !== undefined) str = str.replace(/\$[A-Z_]+\$/g, sub);
   return str;
-  return typeof v === 'function' ? v(arg) : v;
 };
 
 // ── URL scope matching ─────────────────────────────────
@@ -87,6 +114,8 @@ function applyRules(text, anchorEl, ruleSet) {
     }
     if (rule.type === 'regex') {
       try { result = result.replace(new RegExp(rule.from, 'g'), rule.to || ''); } catch {}
+    } else if (rule.smart) {
+      result = smartReplace(result, rule.from, rule.to || '');
     } else {
       result = result.split(rule.from).join(rule.to || '');
     }

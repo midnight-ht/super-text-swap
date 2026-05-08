@@ -15,11 +15,11 @@ const PUNCT_PRESETS = {
     { from: '}',   to: '｝' },        // } -> ｝
     { from: '<',   to: '〈' },        // < -> 〈
     { from: '>',   to: '〉' },        // > -> 〉
-    { from: ',',   to: '，' },        // , -> ，
-    { from: '.',   to: '。' },        // . -> 。
+    { from: ',',   to: '，', smart: true },  // , -> ，  (skip digit,digit)
+    { from: '.',   to: '。', smart: true },  // . -> 。  (skip word.word)
     { from: '!',   to: '！' },        // ! -> ！
     { from: '?',   to: '？' },        // ? -> ？
-    { from: ':',   to: '：' },        // : -> ：
+    { from: ':',   to: '：', smart: true },  // : -> ：  (skip proto://)
     { from: ';',   to: '；' },        // ; -> ；
     { from: '~',   to: '～' },        // ~ -> ～
   ],
@@ -282,6 +282,7 @@ async function applyPunctPreset(type) {
     to: pair.to,
     type: 'plain',
     enabled: true,
+    smart: !!pair.smart,
     scope,
   }));
 
