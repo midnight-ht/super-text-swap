@@ -1,35 +1,43 @@
 let currentRules = [];
 let observer = null;
 let processedMark = new WeakMap();
-let uiLang = 'zh_CN';
+let uiLang = "zh_CN";
 
 const SKIP_TAGS = new Set([
-  'SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME',
-  'TEXTAREA', 'INPUT', 'CODE', 'PRE', 'SELECT', 'OPTION',
+  "SCRIPT",
+  "STYLE",
+  "NOSCRIPT",
+  "IFRAME",
+  "TEXTAREA",
+  "INPUT",
+  "CODE",
+  "PRE",
+  "SELECT",
+  "OPTION",
 ]);
 
 // Context-aware replacement for punctuation presets.
 // Protects patterns like domain.com, file.txt, 3.14, 1,000, http://
 function smartReplace(text, from, to) {
   switch (from) {
-    case '.':
+    case ".":
       // Skip when dot is between alphanumeric chars: domain.com, file.txt, 3.14
       return text.replace(/\./g, (m, i, s) => {
-        const prev = i > 0 ? s[i - 1] : '';
-        const next = i < s.length - 1 ? s[i + 1] : '';
+        const prev = i > 0 ? s[i - 1] : "";
+        const next = i < s.length - 1 ? s[i + 1] : "";
         return /[a-zA-Z0-9]/.test(prev) && /[a-zA-Z0-9]/.test(next) ? m : to;
       });
-    case ',':
+    case ",":
       // Skip when comma is between digits: 1,000,000
       return text.replace(/,/g, (m, i, s) => {
-        const prev = i > 0 ? s[i - 1] : '';
-        const next = i < s.length - 1 ? s[i + 1] : '';
+        const prev = i > 0 ? s[i - 1] : "";
+        const next = i < s.length - 1 ? s[i + 1] : "";
         return /\d/.test(prev) && /\d/.test(next) ? m : to;
       });
-    case ':':
+    case ":":
       // Skip in URL protocols: http:// https:// ftp://
       return text.replace(/:/g, (m, i, s) =>
-        s.slice(i + 1, i + 3) === '//' ? m : to
+        s.slice(i + 1, i + 3) === "//" ? m : to,
       );
     default:
       return text.split(from).join(to);
@@ -57,20 +65,22 @@ const msg = (key, sub) => {
 // ── URL scope matching ─────────────────────────────────
 function matchesCurrentUrl(rule) {
   const scope = rule.scope;
-  if (!scope?.urlMode || scope.urlMode === 'all') return true;
+  if (!scope?.urlMode || scope.urlMode === "all") return true;
 
-  if (scope.urlMode === 'domain') {
-    const pattern = (scope.urlPattern || '').trim();
+  if (scope.urlMode === "domain") {
+    const pattern = (scope.urlPattern || "").trim();
     if (!pattern) return true;
     const host = location.hostname;
-    return host === pattern || host.endsWith('.' + pattern);
+    return host === pattern || host.endsWith("." + pattern);
   }
 
-  if (scope.urlMode === 'custom') {
-    const pattern = (scope.urlPattern || '').trim();
+  if (scope.urlMode === "custom") {
+    const pattern = (scope.urlPattern || "").trim();
     if (!pattern) return true;
     try {
-      const re = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+      const re = pattern
+        .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+        .replace(/\*/g, ".*");
       return new RegExp(re).test(location.href);
     } catch {
       return location.href.includes(pattern);
@@ -83,12 +93,12 @@ function matchesCurrentUrl(rule) {
 // ── Load rules + language ──────────────────────────────
 async function loadRules() {
   const [syncResult, localResult] = await Promise.all([
-    chrome.storage.sync.get(['rules']),
-    chrome.storage.local.get(['lang']),
+    chrome.storage.sync.get(["rules"]),
+    chrome.storage.local.get(["lang"]),
   ]);
-  uiLang = localResult.lang || 'zh_CN';
+  uiLang = localResult.lang || "zh_CN";
   currentRules = (syncResult.rules || []).filter(
-    r => r.enabled && r.from && matchesCurrentUrl(r)
+    (r) => r.enabled && r.from && matchesCurrentUrl(r),
   );
   await loadUIMessages(uiLang);
 }
@@ -110,14 +120,18 @@ function applyRules(text, anchorEl, ruleSet) {
     if (rule.scope?.domSelector) {
       try {
         if (!anchorEl?.closest(rule.scope.domSelector)) continue;
-      } catch { continue; }
+      } catch {
+        continue;
+      }
     }
-    if (rule.type === 'regex') {
-      try { result = result.replace(new RegExp(rule.from, 'g'), rule.to || ''); } catch {}
+    if (rule.type === "regex") {
+      try {
+        result = result.replace(new RegExp(rule.from, "g"), rule.to || "");
+      } catch {}
     } else if (rule.smart) {
-      result = smartReplace(result, rule.from, rule.to || '');
+      result = smartReplace(result, rule.from, rule.to || "");
     } else {
-      result = result.split(rule.from).join(rule.to || '');
+      result = result.split(rule.from).join(rule.to || "");
     }
   }
   return result;
@@ -130,7 +144,7 @@ function replaceTextNode(node) {
   if (!original || !original.trim()) return;
   if (processedMark.get(node) === original) return;
 
-  const anchor   = node.parentElement;
+  const anchor = node.parentElement;
   const replaced = applyRules(original, anchor, currentRules);
   if (replaced !== original) {
     node.nodeValue = replaced;
@@ -144,8 +158,10 @@ function replaceTextNode(node) {
 function walkAndReplace(root = document.body) {
   if (!root) return;
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-    acceptNode: node =>
-      shouldSkipNode(node) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+    acceptNode: (node) =>
+      shouldSkipNode(node)
+        ? NodeFilter.FILTER_REJECT
+        : NodeFilter.FILTER_ACCEPT,
   });
   let node;
   while ((node = walker.nextNode())) replaceTextNode(node);
@@ -153,10 +169,11 @@ function walkAndReplace(root = document.body) {
 
 // ── Input / textarea replacement ───────────────────────
 function replaceInInputs() {
-  const inputRules = currentRules.filter(r => r.scope?.includeInputs);
+  const inputRules = currentRules.filter((r) => r.scope?.includeInputs);
   if (!inputRules.length) return;
-  const sel = 'input[type="text"],input[type="search"],input[type="email"],input[type="url"],input:not([type]),textarea';
-  document.querySelectorAll(sel).forEach(el => {
+  const sel =
+    'input[type="text"],input[type="search"],input[type="email"],input[type="url"],input:not([type]),textarea';
+  document.querySelectorAll(sel).forEach((el) => {
     if (!el.value) return;
     const replaced = applyRules(el.value, el, inputRules);
     if (replaced !== el.value) el.value = replaced;
@@ -165,9 +182,9 @@ function replaceInInputs() {
 
 // ── Contenteditable (rich text) replacement ────────────
 function replaceInEditables() {
-  const editableRules = currentRules.filter(r => r.scope?.includeEditable);
+  const editableRules = currentRules.filter((r) => r.scope?.includeEditable);
   if (!editableRules.length) return;
-  document.querySelectorAll('[contenteditable="true"]').forEach(editable => {
+  document.querySelectorAll('[contenteditable="true"]').forEach((editable) => {
     const walker = document.createTreeWalker(editable, NodeFilter.SHOW_TEXT);
     let node;
     while ((node = walker.nextNode())) {
@@ -187,15 +204,16 @@ function flushPendingNodes() {
   mutationTimer = null;
   const batch = pendingNodes.splice(0);
   for (const node of batch) {
-    if (node.nodeType === Node.TEXT_NODE)    replaceTextNode(node);
+    if (node.nodeType === Node.TEXT_NODE) replaceTextNode(node);
     else if (node.nodeType === Node.ELEMENT_NODE) walkAndReplace(node);
   }
 }
 
 function observePageChanges() {
   if (observer) observer.disconnect();
-  observer = new MutationObserver(mutations => {
-    for (const m of mutations) for (const n of m.addedNodes) pendingNodes.push(n);
+  observer = new MutationObserver((mutations) => {
+    for (const m of mutations)
+      for (const n of m.addedNodes) pendingNodes.push(n);
     if (!mutationTimer) mutationTimer = setTimeout(flushPendingNodes, 50);
   });
   observer.observe(document.body, { childList: true, subtree: true });
@@ -214,43 +232,67 @@ async function refresh() {
 // ══════════════════════════════════════════════════════
 // Element Picker
 // ══════════════════════════════════════════════════════
-let pickMode    = false;
+let pickMode = false;
 let pickHighlight = null;
 
 function generateSelector(el) {
-  if (!el || el === document.body) return 'body';
+  if (!el || el === document.body) return "body";
   if (el.id) return `#${CSS.escape(el.id)}`;
 
-  const classes = Array.from(el.classList).filter(c => c.length > 1 && !/^\d/.test(c));
+  const classes = Array.from(el.classList).filter(
+    (c) => c.length > 1 && !/^\d/.test(c),
+  );
   if (classes.length) {
-    return el.tagName.toLowerCase() + classes.slice(0, 2).map(c => `.${CSS.escape(c)}`).join('');
+    return (
+      el.tagName.toLowerCase() +
+      classes
+        .slice(0, 2)
+        .map((c) => `.${CSS.escape(c)}`)
+        .join("")
+    );
   }
 
   const segments = [];
   let node = el;
   while (node && node !== document.documentElement && segments.length < 4) {
-    if (node.id) { segments.unshift(`#${CSS.escape(node.id)}`); break; }
+    if (node.id) {
+      segments.unshift(`#${CSS.escape(node.id)}`);
+      break;
+    }
     const tag = node.tagName.toLowerCase();
     const cls = Array.from(node.classList)
-      .filter(c => c.length > 1 && !/^\d/.test(c))
-      .slice(0, 1).map(c => `.${CSS.escape(c)}`).join('');
+      .filter((c) => c.length > 1 && !/^\d/.test(c))
+      .slice(0, 1)
+      .map((c) => `.${CSS.escape(c)}`)
+      .join("");
     segments.unshift(cls ? `${tag}${cls}` : tag);
     node = node.parentElement;
   }
-  return segments.join(' > ') || el.tagName.toLowerCase();
+  return segments.join(" > ") || el.tagName.toLowerCase();
 }
 
 function showPageToast(text) {
-  document.getElementById('__textswap_toast__')?.remove();
-  const el = document.createElement('div');
-  el.id = '__textswap_toast__';
+  document.getElementById("__SuperTextSwap_toast__")?.remove();
+  const el = document.createElement("div");
+  el.id = "__SuperTextSwap_toast__";
   el.style.cssText = [
-    'position:fixed','bottom:24px','left:50%','transform:translateX(-50%)',
-    'background:rgba(0,0,0,0.82)','color:#fff','padding:8px 18px',
-    'border-radius:8px','font-size:13px','z-index:2147483647',
-    'font-family:system-ui,sans-serif','pointer-events:none',
-    'white-space:nowrap','max-width:90vw','overflow:hidden','text-overflow:ellipsis',
-  ].join(';');
+    "position:fixed",
+    "bottom:24px",
+    "left:50%",
+    "transform:translateX(-50%)",
+    "background:rgba(0,0,0,0.82)",
+    "color:#fff",
+    "padding:8px 18px",
+    "border-radius:8px",
+    "font-size:13px",
+    "z-index:2147483647",
+    "font-family:system-ui,sans-serif",
+    "pointer-events:none",
+    "white-space:nowrap",
+    "max-width:90vw",
+    "overflow:hidden",
+    "text-overflow:ellipsis",
+  ].join(";");
   el.textContent = text;
   document.body.appendChild(el);
   setTimeout(() => el?.remove(), 3000);
@@ -260,8 +302,10 @@ function onPickMouseMove(e) {
   if (!pickHighlight || e.target === pickHighlight) return;
   const r = e.target.getBoundingClientRect();
   Object.assign(pickHighlight.style, {
-    top: `${r.top}px`, left: `${r.left}px`,
-    width: `${r.width}px`, height: `${r.height}px`,
+    top: `${r.top}px`,
+    left: `${r.left}px`,
+    width: `${r.width}px`,
+    height: `${r.height}px`,
   });
 }
 
@@ -273,48 +317,52 @@ function onPickClick(e) {
 }
 
 function onPickKeyDown(e) {
-  if (e.key === 'Escape') exitPickMode(null);
+  if (e.key === "Escape") exitPickMode(null);
 }
 
 function enterPickMode() {
   if (pickMode) return;
   pickMode = true;
-  document.body.style.cursor = 'crosshair';
+  document.body.style.cursor = "crosshair";
 
-  pickHighlight = document.createElement('div');
+  pickHighlight = document.createElement("div");
   pickHighlight.style.cssText = [
-    'position:fixed','pointer-events:none',
-    'border:2px solid #2563eb',
-    'background:rgba(37,99,235,0.1)',
-    'border-radius:3px','z-index:2147483646',
-    'transition:top 0.05s,left 0.05s,width 0.05s,height 0.05s',
-    'box-shadow:0 0 0 2000px rgba(0,0,0,0.18)',
-  ].join(';');
+    "position:fixed",
+    "pointer-events:none",
+    "border:2px solid #2563eb",
+    "background:rgba(37,99,235,0.1)",
+    "border-radius:3px",
+    "z-index:2147483646",
+    "transition:top 0.05s,left 0.05s,width 0.05s,height 0.05s",
+    "box-shadow:0 0 0 2000px rgba(0,0,0,0.18)",
+  ].join(";");
   document.body.appendChild(pickHighlight);
 
-  document.addEventListener('mousemove', onPickMouseMove, true);
-  document.addEventListener('click',     onPickClick,     true);
-  document.addEventListener('keydown',   onPickKeyDown,   true);
+  document.addEventListener("mousemove", onPickMouseMove, true);
+  document.addEventListener("click", onPickClick, true);
+  document.addEventListener("keydown", onPickKeyDown, true);
 
-  showPageToast(msg('pickPrompt'));
+  showPageToast(msg("pickPrompt"));
 }
 
 async function exitPickMode(selector) {
   pickMode = false;
-  document.body.style.cursor = '';
+  document.body.style.cursor = "";
   pickHighlight?.remove();
   pickHighlight = null;
-  document.removeEventListener('mousemove', onPickMouseMove, true);
-  document.removeEventListener('click',     onPickClick,     true);
-  document.removeEventListener('keydown',   onPickKeyDown,   true);
+  document.removeEventListener("mousemove", onPickMouseMove, true);
+  document.removeEventListener("click", onPickClick, true);
+  document.removeEventListener("keydown", onPickKeyDown, true);
 
   if (selector) {
     await chrome.storage.local.set({ pendingSelector: selector });
     // Ask background to reopen the popup (Chrome 127+, no user gesture needed)
-    chrome.runtime.sendMessage({ type: 'TEXT_SWAP_OPEN_POPUP' }).catch(() => {});
-    showPageToast(msg('pickDone', selector));
+    chrome.runtime
+      .sendMessage({ type: "TEXT_SWAP_OPEN_POPUP" })
+      .catch(() => {});
+    showPageToast(msg("pickDone", selector));
   } else {
-    showPageToast(msg('pickCancel'));
+    showPageToast(msg("pickCancel"));
   }
 }
 
@@ -324,14 +372,22 @@ async function exitPickMode(selector) {
 // refresh() will restore the page to saved-rules-only state.
 function applyTempRules(tempRules) {
   if (!tempRules?.length) return;
-  const active = tempRules.filter(r => r.enabled && r.from && matchesCurrentUrl(r));
+  const active = tempRules.filter(
+    (r) => r.enabled && r.from && matchesCurrentUrl(r),
+  );
   if (!active.length) return;
 
   // Regular text nodes
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-    acceptNode: node =>
-      shouldSkipNode(node) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
-  });
+  const walker = document.createTreeWalker(
+    document.body,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode: (node) =>
+        shouldSkipNode(node)
+          ? NodeFilter.FILTER_REJECT
+          : NodeFilter.FILTER_ACCEPT,
+    },
+  );
   let node;
   while ((node = walker.nextNode())) {
     const original = node.nodeValue;
@@ -341,11 +397,12 @@ function applyTempRules(tempRules) {
   }
 
   // Input / textarea
-  const inputRules = active.filter(r => r.scope?.includeInputs);
+  const inputRules = active.filter((r) => r.scope?.includeInputs);
   if (inputRules.length) {
-    const sel = 'input[type="text"],input[type="search"],input[type="email"],' +
-                'input[type="url"],input:not([type]),textarea';
-    document.querySelectorAll(sel).forEach(el => {
+    const sel =
+      'input[type="text"],input[type="search"],input[type="email"],' +
+      'input[type="url"],input:not([type]),textarea';
+    document.querySelectorAll(sel).forEach((el) => {
       if (!el.value) return;
       const replaced = applyRules(el.value, el, inputRules);
       if (replaced !== el.value) el.value = replaced;
@@ -353,18 +410,20 @@ function applyTempRules(tempRules) {
   }
 
   // Contenteditable
-  const editableRules = active.filter(r => r.scope?.includeEditable);
+  const editableRules = active.filter((r) => r.scope?.includeEditable);
   if (editableRules.length) {
-    document.querySelectorAll('[contenteditable="true"]').forEach(editable => {
-      const w = document.createTreeWalker(editable, NodeFilter.SHOW_TEXT);
-      let n;
-      while ((n = w.nextNode())) {
-        const original = n.nodeValue;
-        if (!original || !original.trim()) continue;
-        const replaced = applyRules(original, n.parentElement, editableRules);
-        if (replaced !== original) n.nodeValue = replaced;
-      }
-    });
+    document
+      .querySelectorAll('[contenteditable="true"]')
+      .forEach((editable) => {
+        const w = document.createTreeWalker(editable, NodeFilter.SHOW_TEXT);
+        let n;
+        while ((n = w.nextNode())) {
+          const original = n.nodeValue;
+          if (!original || !original.trim()) continue;
+          const replaced = applyRules(original, n.parentElement, editableRules);
+          if (replaced !== original) n.nodeValue = replaced;
+        }
+      });
   }
 }
 
@@ -380,19 +439,19 @@ function applyZhQuoteParser(scope) {
 
   function parseText(text) {
     if (text.indexOf('"') === -1 && text.indexOf("'") === -1) return text;
-    let out = '';
+    let out = "";
     for (let i = 0; i < text.length; i++) {
-      const ch   = text[i];
-      const prev = i > 0               ? text[i - 1] : '\n';
-      const next = i < text.length - 1 ? text[i + 1] : '\n';
+      const ch = text[i];
+      const prev = i > 0 ? text[i - 1] : "\n";
+      const next = i < text.length - 1 ? text[i + 1] : "\n";
       if (ch === '"') {
-        out += dq ? '”' : '“';
+        out += dq ? "”" : "“";
         dq = !dq;
       } else if (ch === "'") {
         if (/\w/.test(prev) && /\w/.test(next)) {
-          out += '’'; // typographic apostrophe — don't toggle parity
+          out += "’"; // typographic apostrophe — don't toggle parity
         } else {
-          out += sq ? '’' : '‘';
+          out += sq ? "’" : "‘";
           sq = !sq;
         }
       } else {
@@ -403,20 +462,27 @@ function applyZhQuoteParser(scope) {
   }
 
   // Walk text nodes; state persists across nodes for correct cross-element pairing
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-    acceptNode(node) {
-      const el = node.parentElement;
-      if (!el) return NodeFilter.FILTER_REJECT;
-      if (SKIP_TAGS.has(el.tagName)) return NodeFilter.FILTER_REJECT;
-      if (el.isContentEditable && !scope?.includeEditable) return NodeFilter.FILTER_REJECT;
-      if (scope?.domSelector) {
-        try {
-          if (!el.closest(scope.domSelector)) return NodeFilter.FILTER_REJECT;
-        } catch { return NodeFilter.FILTER_REJECT; }
-      }
-      return NodeFilter.FILTER_ACCEPT;
+  const walker = document.createTreeWalker(
+    document.body,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode(node) {
+        const el = node.parentElement;
+        if (!el) return NodeFilter.FILTER_REJECT;
+        if (SKIP_TAGS.has(el.tagName)) return NodeFilter.FILTER_REJECT;
+        if (el.isContentEditable && !scope?.includeEditable)
+          return NodeFilter.FILTER_REJECT;
+        if (scope?.domSelector) {
+          try {
+            if (!el.closest(scope.domSelector)) return NodeFilter.FILTER_REJECT;
+          } catch {
+            return NodeFilter.FILTER_REJECT;
+          }
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      },
     },
-  });
+  );
 
   let node;
   while ((node = walker.nextNode())) {
@@ -428,19 +494,31 @@ function applyZhQuoteParser(scope) {
 
   // Input/textarea: fresh state per element (quotes don't span multiple fields)
   if (scope?.includeInputs) {
-    const sel = 'input[type="text"],input[type="search"],input[type="email"],' +
-                'input[type="url"],input:not([type]),textarea';
-    document.querySelectorAll(sel).forEach(el => {
+    const sel =
+      'input[type="text"],input[type="search"],input[type="email"],' +
+      'input[type="url"],input:not([type]),textarea';
+    document.querySelectorAll(sel).forEach((el) => {
       const v = el.value;
       if (!v || (v.indexOf('"') === -1 && v.indexOf("'") === -1)) return;
-      let d = false, s = false, out = '';
+      let d = false,
+        s = false,
+        out = "";
       for (let i = 0; i < v.length; i++) {
-        const ch = v[i], prev = i > 0 ? v[i-1] : '\n', next = i < v.length-1 ? v[i+1] : '\n';
-        if (ch === '"') { out += d ? '”' : '“'; d = !d; }
-        else if (ch === "'") {
-          if (/\w/.test(prev) && /\w/.test(next)) out += '’';
-          else { out += s ? '’' : '‘'; s = !s; }
-        } else { out += ch; }
+        const ch = v[i],
+          prev = i > 0 ? v[i - 1] : "\n",
+          next = i < v.length - 1 ? v[i + 1] : "\n";
+        if (ch === '"') {
+          out += d ? "”" : "“";
+          d = !d;
+        } else if (ch === "'") {
+          if (/\w/.test(prev) && /\w/.test(next)) out += "’";
+          else {
+            out += s ? "’" : "‘";
+            s = !s;
+          }
+        } else {
+          out += ch;
+        }
       }
       if (out !== v) el.value = out;
     });
@@ -449,14 +527,12 @@ function applyZhQuoteParser(scope) {
 
 // ── Message listener ───────────────────────────────────
 chrome.runtime.onMessage.addListener((message) => {
-  if (message.type === 'TEXT_SWAP_RULES_UPDATED') refresh();
-  if (message.type === 'TEXT_SWAP_PICK_START')
-    loadRules().then(enterPickMode);
-  if (message.type === 'TEXT_SWAP_APPLY_TEMP')
-    applyTempRules(message.rules);
-  if (message.type === 'TEXT_SWAP_APPLY_PUNCT') {
+  if (message.type === "TEXT_SWAP_RULES_UPDATED") refresh();
+  if (message.type === "TEXT_SWAP_PICK_START") loadRules().then(enterPickMode);
+  if (message.type === "TEXT_SWAP_APPLY_TEMP") applyTempRules(message.rules);
+  if (message.type === "TEXT_SWAP_APPLY_PUNCT") {
     applyTempRules(message.rules); // simple rules first (brackets, punctuation)
-    if (message.direction === 'zh') applyZhQuoteParser(message.scope);
+    if (message.direction === "zh") applyZhQuoteParser(message.scope);
   }
 });
 

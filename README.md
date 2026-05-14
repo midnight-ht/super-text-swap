@@ -1,4 +1,4 @@
-# TextSwap
+# SuperTextSwap
 
 **English** | **[中文文档](README.zh-CN.md)**
 
@@ -58,7 +58,7 @@ Load the unpacked `dist/` folder via Chrome → Extensions → **Load unpacked**
 
 ## Usage
 
-1. Click the **TextSwap** icon in the Chrome toolbar.
+1. Click the **SuperTextSwap** icon in the Chrome toolbar.
 2. Enter the **From** text and the **To** replacement.
 3. Expand **Scope & Targets** to restrict by URL or DOM element (optional).
 4. Click **Add Rule** — the current page updates instantly.

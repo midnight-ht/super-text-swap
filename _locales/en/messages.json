@@ -1,6 +1,6 @@
 {
   "extName": {
-    "message": "TextSwap - Web Text Replacer",
+    "message": "SuperTextSwap - Web Text Replacer",
     "description": "Extension name shown in Chrome"
   },
   "extDesc": {
@@ -8,49 +8,54 @@
     "description": "Extension description shown in Chrome"
   },
 
-  "langToggle":  { "message": "中",            "description": "Label shown on language toggle button" },
-  "applyBtn":    { "message": "⟳ Apply Now" },
-  "subtitle":    { "message": "Web Text Replacer" },
+  "langToggle": {
+    "message": "中",
+    "description": "Label shown on language toggle button"
+  },
+  "applyBtn": { "message": "⟳ Apply Now" },
+  "subtitle": { "message": "Web Text Replacer" },
 
-  "fromLabel":   { "message": "From" },
-  "fromPh":      { "message": "Text to replace" },
-  "toLabel":     { "message": "To" },
-  "toPh":        { "message": "Replacement text" },
+  "fromLabel": { "message": "From" },
+  "fromPh": { "message": "Text to replace" },
+  "toLabel": { "message": "To" },
+  "toPh": { "message": "Replacement text" },
 
-  "advancedTitle":       { "message": "Scope & Targets" },
-  "urlScopeLabel":       { "message": "URL Scope" },
-  "urlAll":              { "message": "All pages" },
-  "urlDomain":           { "message": "Current domain" },
-  "urlCustom":           { "message": "Custom" },
-  "urlPh":               { "message": "e.g. *.example.com or example.com/post/*" },
-  "domScopeLabel":       { "message": "Limit to element" },
-  "domPh":               { "message": "CSS selector (empty = entire page)" },
-  "pickBtn":             { "message": "⊕ Pick" },
-  "targetLabel":         { "message": "Extra Targets" },
-  "includeInputsLabel":  { "message": "Input fields (input / textarea)" },
-  "includeEditableLabel":{ "message": "Rich text editor (contenteditable)" },
+  "advancedTitle": { "message": "Scope & Targets" },
+  "urlScopeLabel": { "message": "URL Scope" },
+  "urlAll": { "message": "All pages" },
+  "urlDomain": { "message": "Current domain" },
+  "urlCustom": { "message": "Custom" },
+  "urlPh": { "message": "e.g. *.example.com or example.com/post/*" },
+  "domScopeLabel": { "message": "Limit to element" },
+  "domPh": { "message": "CSS selector (empty = entire page)" },
+  "pickBtn": { "message": "⊕ Pick" },
+  "targetLabel": { "message": "Extra Targets" },
+  "includeInputsLabel": { "message": "Input fields (input / textarea)" },
+  "includeEditableLabel": { "message": "Rich text editor (contenteditable)" },
 
-  "addBtn":      { "message": "Add Rule" },
-  "clearBtn":    { "message": "Clear All" },
-  "rulesTitle":  { "message": "Rules" },
-  "rulesEmpty":  { "message": "No rules yet" },
+  "addBtn": { "message": "Add Rule" },
+  "clearBtn": { "message": "Clear All" },
+  "rulesTitle": { "message": "Rules" },
+  "rulesEmpty": { "message": "No rules yet" },
   "countSuffix": { "message": "" },
-  "badgeInput":    { "message": "input" },
+  "badgeInput": { "message": "input" },
   "badgeEditable": { "message": "rich-text" },
 
-  "toastAdded":           { "message": "Rule added" },
-  "toastDeleted":         { "message": "Rule deleted" },
-  "toastCleared":         { "message": "All rules cleared" },
-  "toastApplied":         { "message": "Applied to current page" },
-  "toastNoPage":          { "message": "Cannot access current page" },
-  "toastNoInject":        { "message": "Script injection not allowed here" },
-  "toastNoPick":          { "message": "Element picking not supported here" },
-  "toastNoRules":         { "message": "No rules to clear" },
-  "toastExists":          { "message": "Source text already exists" },
-  "toastFromRequired":    { "message": "Please enter source text" },
+  "toastAdded": { "message": "Rule added" },
+  "toastDeleted": { "message": "Rule deleted" },
+  "toastCleared": { "message": "All rules cleared" },
+  "toastApplied": { "message": "Applied to current page" },
+  "toastNoPage": { "message": "Cannot access current page" },
+  "toastNoInject": { "message": "Script injection not allowed here" },
+  "toastNoPick": { "message": "Element picking not supported here" },
+  "toastNoRules": { "message": "No rules to clear" },
+  "toastExists": { "message": "Source text already exists" },
+  "toastFromRequired": { "message": "Please enter source text" },
   "toastSelectorFilled": {
     "message": "Selector filled: $SELECTOR$",
-    "placeholders": { "selector": { "content": "$1", "example": ".article-content" } }
+    "placeholders": {
+      "selector": { "content": "$1", "example": ".article-content" }
+    }
   },
 
   "pickPrompt": { "message": "Click target element  ·  Esc to cancel" },
@@ -61,28 +66,40 @@
   "pickCancel": { "message": "Cancelled" },
 
   "toastTempApplied": { "message": "Temporarily applied to page" },
-  "toastTempFromRequired": { "message": "Please enter source text before applying" },
+  "toastTempFromRequired": {
+    "message": "Please enter source text before applying"
+  },
   "toastPunctApplied": { "message": "Punctuation converted (temporary)" },
 
-  "quickLabel":  { "message": "Quick Actions" },
-  "punctZhBtn":  { "message": "→ Chinese Punct." },
-  "punctEnBtn":  { "message": "→ English Punct." },
+  "quickLabel": { "message": "Quick Actions" },
+  "punctZhBtn": { "message": "→ Chinese Punct." },
+  "punctEnBtn": { "message": "→ English Punct." },
 
   "helpTitle": { "message": "How it works" },
   "helpClose": { "message": "Close" },
 
   "helpS1Title": { "message": "Add Rule (Persistent)" },
-  "helpS1Desc":  { "message": "Saved to local storage and applied automatically on every page load. Rules survive browser restarts." },
+  "helpS1Desc": {
+    "message": "Saved to local storage and applied automatically on every page load. Rules survive browser restarts."
+  },
 
   "helpS2Title": { "message": "Apply Now (Temporary)" },
-  "helpS2Desc":  { "message": "Applies the current From / To inputs and scope settings to the page immediately without saving. Resets when the page refreshes." },
+  "helpS2Desc": {
+    "message": "Applies the current From / To inputs and scope settings to the page immediately without saving. Resets when the page refreshes."
+  },
 
   "helpS3Title": { "message": "Scope (URL / DOM Element)" },
-  "helpS3Desc":  { "message": "URL Scope: controls which pages the rule applies to.\nLimit to element: only replaces text within a CSS selector. Use ⊕ Pick to select the element visually." },
+  "helpS3Desc": {
+    "message": "URL Scope: controls which pages the rule applies to.\nLimit to element: only replaces text within a CSS selector. Use ⊕ Pick to select the element visually."
+  },
 
   "helpS4Title": { "message": "Extra Targets" },
-  "helpS4Desc":  { "message": "By default only visible text nodes are replaced.\nEnable Input fields to also replace input / textarea values; enable Rich text to also replace contenteditable editor content." },
+  "helpS4Desc": {
+    "message": "By default only visible text nodes are replaced.\nEnable Input fields to also replace input / textarea values; enable Rich text to also replace contenteditable editor content."
+  },
 
   "helpS5Title": { "message": "Rule List" },
-  "helpS5Desc":  { "message": "Saved rules run in order. Click × to delete one, Clear All to remove all. Colored badges indicate a rule has URL or element scope restrictions." }
+  "helpS5Desc": {
+    "message": "Saved rules run in order. Click × to delete one, Clear All to remove all. Colored badges indicate a rule has URL or element scope restrictions."
+  }
 }

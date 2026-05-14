@@ -1,4 +1,4 @@
-# TextSwap 文本替换助手
+# SuperTextSwap 文本替换助手
 
 **[English](README.md)** | **中文文档**
 
@@ -58,7 +58,7 @@ npm run build        # 生成 dist/ 以及 text-swap-vX.X.X.zip/.crx
 
 ## 使用方法
 
-1. 点击工具栏中的 **TextSwap** 图标打开弹窗。
+1. 点击工具栏中的 **SuperTextSwap** 图标打开弹窗。
 2. 在**原文本**和**替换为**输入框中填写规则。
 3. 展开**限定范围 & 替换目标**，按需配置 URL 或 DOM 元素限定（可选）。
 4. 点击**添加规则**——当前页面立即生效。

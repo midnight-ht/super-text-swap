@@ -1,6 +1,6 @@
 {
   "extName": {
-    "message": "TextSwap 文本替换助手",
+    "message": "SuperTextSwap 文本替换助手",
     "description": "Extension name shown in Chrome"
   },
   "extDesc": {
@@ -8,49 +8,54 @@
     "description": "Extension description shown in Chrome"
   },
 
-  "langToggle":  { "message": "EN",           "description": "Label shown on language toggle button" },
-  "applyBtn":    { "message": "⟳ 立即应用" },
-  "subtitle":    { "message": "网页文本替换助手" },
+  "langToggle": {
+    "message": "EN",
+    "description": "Label shown on language toggle button"
+  },
+  "applyBtn": { "message": "⟳ 立即应用" },
+  "subtitle": { "message": "网页文本替换助手" },
 
-  "fromLabel":   { "message": "原文本" },
-  "fromPh":      { "message": "输入需要替换的文本" },
-  "toLabel":     { "message": "替换为" },
-  "toPh":        { "message": "输入替换后的文本" },
+  "fromLabel": { "message": "原文本" },
+  "fromPh": { "message": "输入需要替换的文本" },
+  "toLabel": { "message": "替换为" },
+  "toPh": { "message": "输入替换后的文本" },
 
-  "advancedTitle":       { "message": "限定范围 & 替换目标" },
-  "urlScopeLabel":       { "message": "URL 范围" },
-  "urlAll":              { "message": "所有页面" },
-  "urlDomain":           { "message": "当前域名" },
-  "urlCustom":           { "message": "自定义" },
-  "urlPh":               { "message": "例：*.zhihu.com 或 toutiao.com/article/*" },
-  "domScopeLabel":       { "message": "仅在此元素内生效" },
-  "domPh":               { "message": "CSS 选择器（留空为全页面）" },
-  "pickBtn":             { "message": "⊕ 拾取" },
-  "targetLabel":         { "message": "替换目标（扩展）" },
-  "includeInputsLabel":  { "message": "输入框内容（input / textarea）" },
-  "includeEditableLabel":{ "message": "富文本编辑器（contenteditable）" },
+  "advancedTitle": { "message": "限定范围 & 替换目标" },
+  "urlScopeLabel": { "message": "URL 范围" },
+  "urlAll": { "message": "所有页面" },
+  "urlDomain": { "message": "当前域名" },
+  "urlCustom": { "message": "自定义" },
+  "urlPh": { "message": "例：*.zhihu.com 或 toutiao.com/article/*" },
+  "domScopeLabel": { "message": "仅在此元素内生效" },
+  "domPh": { "message": "CSS 选择器（留空为全页面）" },
+  "pickBtn": { "message": "⊕ 拾取" },
+  "targetLabel": { "message": "替换目标（扩展）" },
+  "includeInputsLabel": { "message": "输入框内容（input / textarea）" },
+  "includeEditableLabel": { "message": "富文本编辑器（contenteditable）" },
 
-  "addBtn":      { "message": "添加规则" },
-  "clearBtn":    { "message": "清空规则" },
-  "rulesTitle":  { "message": "替换规则" },
-  "rulesEmpty":  { "message": "暂无替换规则" },
+  "addBtn": { "message": "添加规则" },
+  "clearBtn": { "message": "清空规则" },
+  "rulesTitle": { "message": "替换规则" },
+  "rulesEmpty": { "message": "暂无替换规则" },
   "countSuffix": { "message": " 条" },
-  "badgeInput":    { "message": "输入框" },
+  "badgeInput": { "message": "输入框" },
   "badgeEditable": { "message": "富文本" },
 
-  "toastAdded":           { "message": "规则已添加" },
-  "toastDeleted":         { "message": "规则已删除" },
-  "toastCleared":         { "message": "规则已清空" },
-  "toastApplied":         { "message": "已应用到当前页面" },
-  "toastNoPage":          { "message": "无法获取当前页面" },
-  "toastNoInject":        { "message": "此页面不支持脚本注入" },
-  "toastNoPick":          { "message": "此页面不支持元素拾取" },
-  "toastNoRules":         { "message": "暂无规则可清空" },
-  "toastExists":          { "message": "该原文本规则已存在" },
-  "toastFromRequired":    { "message": "请输入原文本" },
+  "toastAdded": { "message": "规则已添加" },
+  "toastDeleted": { "message": "规则已删除" },
+  "toastCleared": { "message": "规则已清空" },
+  "toastApplied": { "message": "已应用到当前页面" },
+  "toastNoPage": { "message": "无法获取当前页面" },
+  "toastNoInject": { "message": "此页面不支持脚本注入" },
+  "toastNoPick": { "message": "此页面不支持元素拾取" },
+  "toastNoRules": { "message": "暂无规则可清空" },
+  "toastExists": { "message": "该原文本规则已存在" },
+  "toastFromRequired": { "message": "请输入原文本" },
   "toastSelectorFilled": {
     "message": "已填入：$SELECTOR$",
-    "placeholders": { "selector": { "content": "$1", "example": ".article-content" } }
+    "placeholders": {
+      "selector": { "content": "$1", "example": ".article-content" }
+    }
   },
 
   "pickPrompt": { "message": "请点击目标元素  ·  Esc 取消" },
@@ -64,25 +69,35 @@
   "toastTempFromRequired": { "message": "请先输入原文本再临时应用" },
   "toastPunctApplied": { "message": "标点符号已转换（临时）" },
 
-  "quickLabel":  { "message": "快捷操作" },
-  "punctZhBtn":  { "message": "→ 转中文标点" },
-  "punctEnBtn":  { "message": "→ 转英文标点" },
+  "quickLabel": { "message": "快捷操作" },
+  "punctZhBtn": { "message": "→ 转中文标点" },
+  "punctEnBtn": { "message": "→ 转英文标点" },
 
   "helpTitle": { "message": "功能说明" },
   "helpClose": { "message": "关闭" },
 
   "helpS1Title": { "message": "添加规则（持久化）" },
-  "helpS1Desc":  { "message": "保存到本地存储，每次页面加载自动执行，关闭浏览器后规则不丢失。" },
+  "helpS1Desc": {
+    "message": "保存到本地存储，每次页面加载自动执行，关闭浏览器后规则不丢失。"
+  },
 
   "helpS2Title": { "message": "立即应用（临时）" },
-  "helpS2Desc":  { "message": "将当前输入框的原文本 / 替换文本及范围设置直接应用到页面，不保存为规则。页面刷新后失效。" },
+  "helpS2Desc": {
+    "message": "将当前输入框的原文本 / 替换文本及范围设置直接应用到页面，不保存为规则。页面刷新后失效。"
+  },
 
   "helpS3Title": { "message": "限定范围（URL / DOM 元素）" },
-  "helpS3Desc":  { "message": "URL 范围：控制规则在哪些页面生效。\n仅在此元素内：只替换指定 CSS 选择器内的文本，可用 ⊕ 拾取按钮在页面上点选元素。" },
+  "helpS3Desc": {
+    "message": "URL 范围：控制规则在哪些页面生效。\n仅在此元素内：只替换指定 CSS 选择器内的文本，可用 ⊕ 拾取按钮在页面上点选元素。"
+  },
 
   "helpS4Title": { "message": "替换目标（扩展）" },
-  "helpS4Desc":  { "message": "默认只替换普通可见文本。\n勾选「输入框」后同时替换 input / textarea 的值；勾选「富文本」后同时替换 contenteditable 编辑器的内容。" },
+  "helpS4Desc": {
+    "message": "默认只替换普通可见文本。\n勾选「输入框」后同时替换 input / textarea 的值；勾选「富文本」后同时替换 contenteditable 编辑器的内容。"
+  },
 
   "helpS5Title": { "message": "规则列表" },
-  "helpS5Desc":  { "message": "已保存的规则按添加顺序依次执行。点击 × 删除单条，「清空规则」删除全部。带颜色标签表示该规则设置了 URL 或元素范围限定。" }
+  "helpS5Desc": {
+    "message": "已保存的规则按添加顺序依次执行。点击 × 删除单条，「清空规则」删除全部。带颜色标签表示该规则设置了 URL 或元素范围限定。"
+  }
 }
