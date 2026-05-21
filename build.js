@@ -74,6 +74,8 @@ function clean() {
   log("clean", "dist/");
 }
 
+const NO_OBFUSCATE = process.env.NO_OBFUSCATE === "1";
+
 // ── Step 2: Process source tree ────────────────────────
 function processFile(srcPath, destPath) {
   const ext = path.extname(srcPath).toLowerCase();
@@ -84,9 +86,14 @@ function processFile(srcPath, destPath) {
 
   if (ext === ".js") {
     const src = fs.readFileSync(srcPath, "utf8");
-    const result = JavaScriptObfuscator.obfuscate(src, OBFUSCATOR_OPTIONS);
-    fs.writeFileSync(destPath, result.getObfuscatedCode(), "utf8");
-    log("obfuscate", relPath);
+    if (NO_OBFUSCATE) {
+      fs.writeFileSync(destPath, src, "utf8");
+      log("copy", relPath);
+    } else {
+      const result = JavaScriptObfuscator.obfuscate(src, OBFUSCATOR_OPTIONS);
+      fs.writeFileSync(destPath, result.getObfuscatedCode(), "utf8");
+      log("obfuscate", relPath);
+    }
   } else if (ext === ".json") {
     const src = fs.readFileSync(srcPath, "utf8");
     fs.writeFileSync(destPath, JSON.stringify(JSON.parse(src)), "utf8");
