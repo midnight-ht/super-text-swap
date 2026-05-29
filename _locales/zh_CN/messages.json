@@ -129,7 +129,9 @@
   "quickLabel": { "message": "快捷操作" },
   "punctZhBtn": { "message": "→ 转中文标点" },
   "punctEnBtn": { "message": "→ 转英文标点" },
+  "thousandsBtn": { "message": "数字加千分位" },
   "refreshIncrementBtn": { "message": "刷新自增" },
+  "toastThousandsApplied": { "message": "数字千分位已添加（临时）" },
 
   "helpTitle": { "message": "功能说明" },
   "helpClose": { "message": "关闭" },

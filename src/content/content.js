@@ -83,6 +83,69 @@ function formatNumberLike(raw, value, decimal) {
   return prefix + withCommas + (fraction !== undefined ? "." + fraction : "") + suffix;
 }
 
+function getProtectedNumberRanges(text) {
+  const ranges = [];
+  const addMatches = (re) => {
+    for (const match of String(text).matchAll(re)) {
+      ranges.push([match.index, match.index + match[0].length]);
+    }
+  };
+
+  addMatches(/\b[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}\b/g);
+  addMatches(/\b(?:https?:\/\/|www\.)[^\s<>"']+/gi);
+  addMatches(/\b\d{4}[-/.年]\d{1,2}[-/.月]\d{1,2}(?:日)?\b/g);
+  addMatches(/\b\d{1,2}:\d{2}(?::\d{2})?\b/g);
+  addMatches(/(?:\+?\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?)?\d{3,4}[\s-]\d{4}(?:[\s-]\d{1,6})?\b/g);
+  addMatches(/\b1[3-9]\d{9}\b/g);
+  addMatches(/(?:电话|手机|座机|传真|Tel|TEL|Phone|phone|Mobile|mobile)[:：\s-]*(?:\+?\d[\d\s().-]{5,}\d)/g);
+
+  return ranges.sort((a, b) => a[0] - b[0]);
+}
+
+function isRangeProtected(start, end, ranges) {
+  return ranges.some(([from, to]) => start < to && end > from);
+}
+
+function hasAmountContext(text, start, end) {
+  const before = text.slice(Math.max(0, start - 3), start);
+  const after = text.slice(end, Math.min(text.length, end + 3));
+  return /[$￥¥€£]\s*$/.test(before) || /^\s*(?:元|万|亿|USD|CNY|RMB|美元|人民币|kg|g|km|m²|㎡|%)/i.test(after);
+}
+
+function hasIdentifierContext(text, start) {
+  const before = text.slice(Math.max(0, start - 12), start);
+  return /(?:ID|id|编号|单号|订单|账号|帐号|卡号|证号|身份证|QQ|微信|邮编|邮政编码)\s*[:：#-]?\s*$/.test(before);
+}
+
+function addThousandsToNumberText(numberText) {
+  const text = String(numberText);
+  const sign = text.startsWith("-") ? "-" : "";
+  const unsigned = sign ? text.slice(1) : text;
+  const [integer, fraction] = unsigned.split(".");
+  const plainInteger = integer.replace(/,/g, "");
+  if (plainInteger.length < 4) return text;
+  if (!/^\d+$/.test(plainInteger)) return text;
+  const formattedInteger = plainInteger.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return sign + formattedInteger + (fraction !== undefined ? "." + fraction : "");
+}
+
+function formatThousandsInText(text) {
+  const source = String(text);
+  const protectedRanges = getProtectedNumberRanges(source);
+  return source.replace(/(?<![\w@])[-+]?\d[\d,]*(?:\.\d+)?(?![\w@])/g, (token, offset) => {
+    const end = offset + token.length;
+    if (isRangeProtected(offset, end, protectedRanges)) return token;
+
+    const digitsOnly = token.replace(/[^0-9]/g, "");
+    if (digitsOnly.length < 4) return token;
+    if (digitsOnly.length >= 6 && !/[,.]/.test(token) && !hasAmountContext(source, offset, end) && hasIdentifierContext(source, offset)) {
+      return token;
+    }
+
+    return addThousandsToNumberText(token);
+  });
+}
+
 function scheduleIncrementCacheSave() {
   if (incrementCacheTimer) return;
   incrementCacheTimer = setTimeout(() => {
@@ -1138,6 +1201,65 @@ function applyTempRules(tempRules) {
   }
 }
 
+function shouldAcceptScopedTextNode(node, scope) {
+  if (shouldSkipNode(node)) return false;
+  if (scope?.domSelector && !matchesDomScope(node.parentElement, scope.domSelector)) {
+    return false;
+  }
+  return true;
+}
+
+function applyThousandsFormat(scope) {
+  const pseudoRule = { scope: scope || null };
+  if (!matchesCurrentUrl(pseudoRule)) return;
+
+  const walker = document.createTreeWalker(
+    document.body,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode: (node) =>
+        shouldAcceptScopedTextNode(node, scope)
+          ? NodeFilter.FILTER_ACCEPT
+          : NodeFilter.FILTER_REJECT,
+    },
+  );
+  let node;
+  while ((node = walker.nextNode())) {
+    const original = node.nodeValue;
+    if (!original || !/\d{4,}/.test(original)) continue;
+    const replaced = formatThousandsInText(original);
+    if (replaced !== original) node.nodeValue = replaced;
+  }
+
+  if (scope?.includeInputs) {
+    const sel =
+      'input[type="text"],input[type="search"],input[type="email"],' +
+      'input[type="url"],input:not([type]),textarea';
+    document.querySelectorAll(sel).forEach((el) => {
+      if (!el.value || !/\d{4,}/.test(el.value)) return;
+      if (scope?.domSelector && !matchesDomScope(el, scope.domSelector)) return;
+      const replaced = formatThousandsInText(el.value);
+      if (replaced !== el.value) el.value = replaced;
+    });
+  }
+
+  if (scope?.includeEditable) {
+    document
+      .querySelectorAll('[contenteditable="true"]')
+      .forEach((editable) => {
+        if (scope?.domSelector && !matchesDomScope(editable, scope.domSelector)) return;
+        const w = document.createTreeWalker(editable, NodeFilter.SHOW_TEXT);
+        let n;
+        while ((n = w.nextNode())) {
+          const original = n.nodeValue;
+          if (!original || !/\d{4,}/.test(original)) continue;
+          const replaced = formatThousandsInText(original);
+          if (replaced !== original) n.nodeValue = replaced;
+        }
+      });
+  }
+}
+
 // ── Stateful quote parser for EN→ZH conversion ────────
 // Tracks open/close parity across text nodes so "hello" "world"
 // pairs correctly even when the quotes span multiple DOM elements.
@@ -1259,6 +1381,9 @@ window.__SuperTextSwapMessageHandler = (message) => {
   if (message.type === "TEXT_SWAP_APPLY_PUNCT") {
     applyTempRules(message.rules); // simple rules first (brackets, punctuation)
     if (message.direction === "zh") applyZhQuoteParser(message.scope);
+  }
+  if (message.type === "TEXT_SWAP_FORMAT_THOUSANDS") {
+    applyThousandsFormat(message.scope);
   }
 };
 

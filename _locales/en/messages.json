@@ -131,7 +131,9 @@
   "quickLabel": { "message": "Quick Actions" },
   "punctZhBtn": { "message": "→ Chinese Punct." },
   "punctEnBtn": { "message": "→ English Punct." },
+  "thousandsBtn": { "message": "Add Thousands" },
   "refreshIncrementBtn": { "message": "Refresh Increments" },
+  "toastThousandsApplied": { "message": "Thousands separators added (temporary)" },
 
   "helpTitle": { "message": "How it works" },
   "helpClose": { "message": "Close" },

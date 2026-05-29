@@ -175,6 +175,7 @@ function applyTranslations() {
   setText('quickLabel',           'quickLabel');
   setText('punctZhBtn',           'punctZhBtn');
   setText('punctEnBtn',           'punctEnBtn');
+  setText('thousandsBtn',         'thousandsBtn');
   setText('refreshIncrementBtn',  'refreshIncrementBtn');
   setText('helpTitle',            'helpTitle');
   setText('helpClose',            'helpClose');
@@ -374,6 +375,28 @@ async function applyPunctPreset(type) {
       await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['src/content/content.js'] });
       await sendMsg();
       showToast(t('toastPunctApplied'));
+    } catch {
+      showToast(t('toastNoInject'));
+    }
+  }
+}
+
+async function applyThousandsFormat() {
+  const scope = readScopeFromForm();
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) { showToast(t('toastNoPage')); return; }
+
+  const sendMsg = () =>
+    chrome.tabs.sendMessage(tab.id, { type: 'TEXT_SWAP_FORMAT_THOUSANDS', scope });
+
+  try {
+    await sendMsg();
+    showToast(t('toastThousandsApplied'));
+  } catch {
+    try {
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['src/content/content.js'] });
+      await sendMsg();
+      showToast(t('toastThousandsApplied'));
     } catch {
       showToast(t('toastNoInject'));
     }
@@ -720,6 +743,7 @@ q('clearBtn').addEventListener('click',   clearRules);
 q('applyBtn').addEventListener('click',   applyTemp);
 q('punctZhBtn').addEventListener('click', () => applyPunctPreset('zh'));
 q('punctEnBtn').addEventListener('click', () => applyPunctPreset('en'));
+q('thousandsBtn').addEventListener('click', applyThousandsFormat);
 q('refreshIncrementBtn').addEventListener('click', refreshIncrementCache);
 q('langToggleBtn').addEventListener('click', toggleLang);
 fromInput.addEventListener('keydown', e => { if (e.key === 'Enter') toInput.focus(); });
