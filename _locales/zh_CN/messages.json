@@ -44,6 +44,40 @@
   "incrementMaxPh": { "message": "最大增加" },
   "refreshIncrementLabel": { "message": "刷新时重置" },
 
+  "computeTitle": { "message": "数字/金额自动计算" },
+  "computeEnabledLabel": { "message": "启用" },
+  "computeKeepFormatLabel": { "message": "保留原格式" },
+  "computeHint": { "message": "结果写入下方「仅在此元素内生效」拾取的元素" },
+  "computeSourcesPickBtn": { "message": "⊕ 拾取来源" },
+  "computeSourcesPh": { "message": "未选择来源元素" },
+  "computeSourcesCount": {
+    "message": "$N$ 个来源",
+    "placeholders": { "n": { "content": "$1" } }
+  },
+  "computeOp_sum": { "message": "求和" },
+  "computeOp_avg": { "message": "平均值" },
+  "computeOp_min": { "message": "最小值" },
+  "computeOp_max": { "message": "最大值" },
+  "computeOp_count": { "message": "计数" },
+  "badgeCompute": { "message": "自动计算" },
+  "toastComputeNeedSources": { "message": "请先拾取来源元素" },
+  "toastComputeNeedTarget": { "message": "请先在「仅在此元素内生效」拾取结果元素" },
+  "toastSourcesFilled": {
+    "message": "已添加 $N$ 个来源元素",
+    "placeholders": { "n": { "content": "$1" } }
+  },
+  "pickPromptMulti": { "message": "依次点击多个来源元素  ·  完成后点上方「完成」  ·  Esc 取消" },
+  "pickMultiCount": {
+    "message": "已选 $N$ 个",
+    "placeholders": { "n": { "content": "$1" } }
+  },
+  "pickMultiDone": {
+    "message": "已选择 $N$ 个来源  ·  请重新打开插件",
+    "placeholders": { "n": { "content": "$1" } }
+  },
+  "pickDoneBtn": { "message": "完成" },
+  "pickCancelBtn": { "message": "取消" },
+
   "addBtn": { "message": "添加规则" },
   "clearBtn": { "message": "清空规则" },
   "rulesTitle": { "message": "替换规则" },
@@ -132,6 +166,11 @@
 
   "helpS7Title": { "message": "数字 / 金额随机增加" },
   "helpS7Desc": {
-    "message": "在「功能」中启用后，会自动匹配页面里的数字和金额，并按设置范围随机增加。增量会缓存，刷新页面仍保持一致。点击「刷新自增」会清空缓存并刷新当前页面，重新生成增量。"
+    "message": "在「数字/金额随机增加」中启用后，会自动匹配页面里的数字和金额，并按设置范围随机增加。默认增量会缓存，刷新页面保持一致。勾选「刷新时重置」后，每次刷新页面会读取上次缓存值并在其基础上再次随机增加（累加）。点击「刷新自增」会清空缓存并刷新页面重新生成。"
+  },
+
+  "helpS8Title": { "message": "数字 / 金额自动计算" },
+  "helpS8Desc": {
+    "message": "在「数字/金额自动计算」中启用，选择计算方式（求和 / 平均 / 最小 / 最大 / 计数）。点「⊕ 拾取来源」在页面上依次点选多个来源元素，完成后再在「仅在此元素内生效」拾取一个结果元素。插件会采集各来源的数字进行计算，并把结果写入结果元素：小数位自动按来源中最多的保留；勾选「保留原格式」时沿用来源的货币符号与千分位。来源数字变化时结果会自动重算。"
   }
 }

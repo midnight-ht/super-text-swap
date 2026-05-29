@@ -105,6 +105,13 @@ const incrementEnabledCb = q('incrementEnabled');
 const incrementMinInput  = q('incrementMin');
 const incrementMaxInput  = q('incrementMax');
 const refreshIncrementCb = q('refreshIncrement');
+const computeEnabledCb     = q('computeEnabled');
+const computeOpSelect      = q('computeOp');
+const computeKeepFormatCb  = q('computeKeepFormat');
+const computeSourcesDisplay = q('computeSourcesDisplay');
+
+// Working list of picked source selectors for the auto-compute feature.
+let computeSources = [];
 
 // ── Toast ──────────────────────────────────────────────
 let toastTimer = null;
@@ -155,6 +162,13 @@ function applyTranslations() {
   setPh  ('incrementMin',         'incrementMinPh');
   setPh  ('incrementMax',         'incrementMaxPh');
   setText('refreshIncrementLabel','refreshIncrementLabel');
+  setText('computeTitle',         'computeTitle');
+  setText('computeEnabledLabel',  'computeEnabledLabel');
+  setText('computeKeepFormatLabel','computeKeepFormatLabel');
+  setText('computeHint',          'computeHint');
+  setText('computeSourcesPickBtn','computeSourcesPickBtn');
+  setPh  ('computeSourcesDisplay','computeSourcesPh');
+  setComputeOpLabels();
   setText('addBtn',               'addBtn');
   setText('clearBtn',             'clearBtn');
   setText('rulesTitle',           'rulesTitle');
@@ -204,6 +218,7 @@ function renderHelpBody() {
     ['helpS5Title', 'helpS5Desc'],
     ['helpS6Title', 'helpS6Desc'],
     ['helpS7Title', 'helpS7Desc'],
+    ['helpS8Title', 'helpS8Desc'],
   ];
   q('helpBody').innerHTML = sections.map(([tk, dk]) => `
     <div class="help-section">
@@ -232,8 +247,10 @@ chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
 // ── Restore picker state on popup open ────────────────
 // Called on init. Reads form data + picked selector saved before popup closed.
 async function restorePickerState() {
-  const result = await chrome.storage.local.get(['pendingFormState', 'pendingSelector']);
-  if (!result.pendingFormState && !result.pendingSelector) return;
+  const result = await chrome.storage.local.get([
+    'pendingFormState', 'pendingSelector', 'pendingSources',
+  ]);
+  if (!result.pendingFormState && !result.pendingSelector && !result.pendingSources) return;
 
   // Restore form fields saved before the picker was launched
   if (result.pendingFormState) {
@@ -250,7 +267,25 @@ async function restorePickerState() {
     incrementMinInput.value     = s.incrementMin || '';
     incrementMaxInput.value     = s.incrementMax || '';
     refreshIncrementCb.checked  = !!s.refreshIncrement;
+    computeEnabledCb.checked    = !!s.computeEnabled;
+    if (s.computeOp) computeOpSelect.value = s.computeOp;
+    computeKeepFormatCb.checked = s.computeKeepFormat !== false;
+    if (Array.isArray(s.computeSources)) computeSources = s.computeSources.slice();
+    updateComputeSourcesDisplay();
     await chrome.storage.local.remove(['pendingFormState']);
+  }
+
+  // Merge newly picked source elements (multi-pick) into the working list
+  if (Array.isArray(result.pendingSources) && result.pendingSources.length) {
+    advancedSection.classList.add('open');
+    toggleIcon.classList.add('open');
+    computeEnabledCb.checked = true;
+    for (const sel of result.pendingSources) {
+      if (sel && !computeSources.includes(sel)) computeSources.push(sel);
+    }
+    updateComputeSourcesDisplay();
+    await chrome.storage.local.remove(['pendingSources']);
+    showToast(t('toastSourcesFilled', String(result.pendingSources.length)));
   }
 
   // Fill picked selector and show confirmation
@@ -264,34 +299,39 @@ async function restorePickerState() {
 }
 
 // ── Element picker ─────────────────────────────────────
-q('pickBtn').addEventListener('click', async () => {
+// Persist current form data so it survives popup close/reopen during picking.
+function captureFormState() {
+  return {
+    from:            fromInput.value,
+    to:              toInput.value,
+    urlMode:         document.querySelector('input[name="urlMode"]:checked')?.value || 'all',
+    urlPattern:      urlPatternInput.value,
+    includeInputs:   includeInputsCb.checked,
+    includeEditable: includeEditableCb.checked,
+    incrementEnabled: incrementEnabledCb.checked,
+    incrementMin:     incrementMinInput.value,
+    incrementMax:     incrementMaxInput.value,
+    refreshIncrement: refreshIncrementCb.checked,
+    computeEnabled:   computeEnabledCb.checked,
+    computeOp:        computeOpSelect.value,
+    computeKeepFormat: computeKeepFormatCb.checked,
+    computeSources:   computeSources.slice(),
+  };
+}
+
+async function launchPicker(messageType) {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) { showToast(t('toastNoPage')); return; }
 
-  // Persist current form data so it survives popup close/reopen
-  await chrome.storage.local.set({
-    pendingFormState: {
-      from:            fromInput.value,
-      to:              toInput.value,
-      urlMode:         document.querySelector('input[name="urlMode"]:checked')?.value || 'all',
-      urlPattern:      urlPatternInput.value,
-      includeInputs:   includeInputsCb.checked,
-      includeEditable: includeEditableCb.checked,
-      incrementEnabled: incrementEnabledCb.checked,
-      incrementMin:     incrementMinInput.value,
-      incrementMax:     incrementMaxInput.value,
-      refreshIncrement: refreshIncrementCb.checked,
-    },
-  });
+  await chrome.storage.local.set({ pendingFormState: captureFormState() });
 
-  const sendPick = () =>
-    chrome.tabs.sendMessage(tab.id, { type: 'TEXT_SWAP_PICK_START_V2' });
+  const send = () => chrome.tabs.sendMessage(tab.id, { type: messageType });
   try {
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['src/content/content.js'] });
-    await sendPick();
+    await send();
   } catch {
     try {
-      await sendPick();
+      await send();
     } catch {
       showToast(t('toastNoPick'));
       await chrome.storage.local.remove(['pendingFormState']);
@@ -299,7 +339,10 @@ q('pickBtn').addEventListener('click', async () => {
     }
   }
   window.close();
-});
+}
+
+q('pickBtn').addEventListener('click', () => launchPicker('TEXT_SWAP_PICK_START_V2'));
+q('computeSourcesPickBtn').addEventListener('click', () => launchPicker('TEXT_SWAP_PICK_START_MULTI'));
 
 // ── Punctuation preset apply ───────────────────────────
 // Sends TEXT_SWAP_APPLY_PUNCT so content.js can:
@@ -412,6 +455,8 @@ function getScopeBadgesHtml(rule) {
     parts.push(`<span class="badge badge-mode">${t('badgeRegex')}</span>`);
   if (rule.type === 'number')
     parts.push(`<span class="badge badge-mode">${t('badgeNumberFeature')}</span>`);
+  if (rule.type === 'compute')
+    parts.push(`<span class="badge badge-mode">${t('badgeCompute')}</span>`);
   if (rule.valueTransform?.enabled)
     parts.push(`<span class="badge badge-mode">${t('badgeIncrement', formatIncrementRange(rule.valueTransform))}</span>`);
   if (rule.valueTransform?.refreshIncrement)
@@ -427,6 +472,8 @@ function getRuleBadgesHtml(rule) {
     parts.push(`<span class="badge badge-mode">${t('badgeRegex')}</span>`);
   if (rule.type === 'number')
     parts.push(`<span class="badge badge-mode">${t('badgeNumberFeature')}</span>`);
+  if (rule.type === 'compute')
+    parts.push(`<span class="badge badge-mode">${t('badgeCompute')}</span>`);
   if (rule.valueTransform?.enabled)
     parts.push(`<span class="badge badge-mode">${t('badgeIncrement', formatIncrementRange(rule.valueTransform))}</span>`);
   if (rule.valueTransform?.refreshIncrement)
@@ -465,11 +512,18 @@ function renderRules() {
 }
 
 function getRuleFromText(rule) {
-  return rule.type === 'number' ? t('numberRuleFrom') : rule.from;
+  if (rule.type === 'number') return t('numberRuleFrom');
+  if (rule.type === 'compute') {
+    const op = rule.compute?.op || 'sum';
+    const count = rule.compute?.sources?.length || 0;
+    return `${t('computeOp_' + op)} · ${t('computeSourcesCount', String(count))}`;
+  }
+  return rule.from;
 }
 
 function getRuleToText(rule) {
   if (rule.type === 'number') return formatIncrementRange(rule.valueTransform || {});
+  if (rule.type === 'compute') return rule.scope?.domSelector || '';
   return rule.to;
 }
 
@@ -516,6 +570,31 @@ function readValueTransformFromForm() {
   return { enabled: true, min, max, refreshIncrement: refreshIncrementCb.checked };
 }
 
+const COMPUTE_OPS = ['sum', 'avg', 'min', 'max', 'count'];
+
+function setComputeOpLabels() {
+  if (!computeOpSelect) return;
+  COMPUTE_OPS.forEach(op => {
+    const opt = computeOpSelect.querySelector(`option[value="${op}"]`);
+    if (opt) opt.textContent = t('computeOp_' + op);
+  });
+}
+
+function updateComputeSourcesDisplay() {
+  if (!computeSourcesDisplay) return;
+  computeSourcesDisplay.value = computeSources.length
+    ? t('computeSourcesCount', String(computeSources.length))
+    : '';
+  computeSourcesDisplay.title = computeSources.join('\n');
+}
+
+function readComputeFromForm() {
+  if (!computeEnabledCb.checked) return null;
+  if (!computeSources.length) return null;
+  const op = COMPUTE_OPS.includes(computeOpSelect.value) ? computeOpSelect.value : 'sum';
+  return { op, sources: computeSources.slice(), keepFormat: computeKeepFormatCb.checked };
+}
+
 function resetForm() {
   fromInput.value = '';
   toInput.value   = '';
@@ -529,6 +608,11 @@ function resetForm() {
   incrementMinInput.value    = '';
   incrementMaxInput.value    = '';
   refreshIncrementCb.checked = false;
+  computeEnabledCb.checked   = false;
+  computeOpSelect.value      = 'sum';
+  computeKeepFormatCb.checked = true;
+  computeSources = [];
+  updateComputeSourcesDisplay();
   fromInput.focus();
 }
 
@@ -555,7 +639,25 @@ async function notifyPageRefresh() {
 async function addRule() {
   const from = fromInput.value.trim();
   const to   = toInput.value.trim();
+  const compute = readComputeFromForm();
   const valueTransform = readValueTransformFromForm();
+  const now = Date.now();
+  const scope = readScopeFromForm();
+
+  // Auto-compute rule (sum/avg/min/max/count of multiple picked elements).
+  if (computeEnabledCb.checked) {
+    if (!compute) { showToast(t('toastComputeNeedSources')); return; }
+    if (!scope?.domSelector) { showToast(t('toastComputeNeedTarget')); return; }
+    rules.push({ id: generateId(), from: '', to: '', type: 'compute', enabled: true,
+                 compute, scope, createdAt: now, updatedAt: now });
+    await saveRules();
+    renderRules();
+    resetForm();
+    showToast(t('toastAdded'));
+    notifyPageRefresh();
+    return;
+  }
+
   if (!from && !valueTransform) { showToast(t('toastFromRequired')); fromInput.focus(); return; }
   if (from && !isRegexValid(from)) { showToast(t('toastRegexInvalid')); fromInput.focus(); return; }
   if (incrementEnabledCb.checked && !valueTransform) {
@@ -564,8 +666,6 @@ async function addRule() {
     return;
   }
   if (!valueTransform && from && rules.find(r => r.from === from)) { showToast(t('toastExists')); return; }
-  const now = Date.now();
-  const scope = readScopeFromForm();
   if (valueTransform) {
     rules.push({ id: generateId(), from: '', to: '', type: 'number', enabled: true,
                  valueTransform, scope, createdAt: now, updatedAt: now });

@@ -286,7 +286,10 @@ async function loadRules() {
   uiLang = localResult.lang || "zh_CN";
   incrementCache = localResult.incrementCache || {};
   currentRules = (syncResult.rules || []).filter(
-    (r) => r.enabled && (r.from || r.type === "number") && matchesCurrentUrl(r),
+    (r) =>
+      r.enabled &&
+      (r.from || r.type === "number" || r.type === "compute") &&
+      matchesCurrentUrl(r),
   );
   await loadUIMessages(uiLang);
 }
@@ -456,6 +459,104 @@ function scheduleRenderedScopeRefresh() {
   scopeRefreshTimer = setTimeout(refreshRenderedScopes, 80);
 }
 
+// ── Auto compute (sum / avg / min / max / count) ───────
+// Collects numbers from multiple picked source elements, aggregates them,
+// and writes the result into the target element (rule.scope.domSelector).
+let computeRefreshTimer = null;
+
+function extractNumberFromElement(el) {
+  if (!el) return null;
+  const text = (el.textContent || "").trim();
+  if (!text) return null;
+  const match = text.match(
+    /(?:[$￥¥]\s*)?-?\d[\d,]*(?:\.\d+)?(?:\s*(?:元|万|亿|USD|CNY|RMB|美元|人民币))?/i,
+  );
+  if (!match) return null;
+  const parsed = normalizeNumberToken(match[0]);
+  if (!parsed) return null;
+  return { value: parsed.value, decimal: parsed.decimal, token: match[0] };
+}
+
+function computeAggregate(op, values) {
+  if (!values.length) return null;
+  switch (op) {
+    case "avg":
+      return values.reduce((a, b) => a + b, 0) / values.length;
+    case "min":
+      return Math.min(...values);
+    case "max":
+      return Math.max(...values);
+    case "count":
+      return values.length;
+    case "sum":
+    default:
+      return values.reduce((a, b) => a + b, 0);
+  }
+}
+
+function formatComputeResult(rule, result, sources) {
+  if (rule.compute.op === "count") return String(result);
+  const decimals = Math.max(0, ...sources.map((s) => s.decimal || 0));
+  if (rule.compute.keepFormat && sources[0]) {
+    return formatNumberLike(sources[0].token, result, decimals);
+  }
+  return result.toFixed(decimals);
+}
+
+function setElementResultText(el, text) {
+  if (!el) return;
+  if ((el.textContent || "").trim() === text) return; // no change → avoid loops
+  // Prefer writing into an existing single text node to disturb structure less.
+  const textNodes = Array.from(el.childNodes).filter(
+    (n) => n.nodeType === Node.TEXT_NODE,
+  );
+  if (
+    el.childNodes.length === 1 &&
+    textNodes.length === 1
+  ) {
+    textNodes[0].nodeValue = text;
+  } else {
+    el.textContent = text;
+  }
+}
+
+function applyComputeRule(rule) {
+  const c = rule.compute;
+  if (!c || !Array.isArray(c.sources) || !c.sources.length) return;
+  const targetSel = rule.scope?.domSelector;
+  if (!targetSel) return;
+  const targets = getDomScopeNodes(targetSel);
+  if (!targets.length) return;
+  const targetSet = new Set(targets);
+
+  const sources = [];
+  for (const sel of c.sources) {
+    const el = getDomScopeNodes(sel).find((node) => !targetSet.has(node));
+    if (!el) continue;
+    const parsed = extractNumberFromElement(el);
+    if (parsed) sources.push(parsed);
+  }
+  if (!sources.length) return;
+
+  const result = computeAggregate(c.op, sources.map((s) => s.value));
+  if (result == null || !Number.isFinite(result)) return;
+  const text = formatComputeResult(rule, result, sources);
+
+  for (const target of targets) setElementResultText(target, text);
+}
+
+function refreshComputeRules() {
+  computeRefreshTimer = null;
+  for (const rule of currentRules) {
+    if (rule.type === "compute") applyComputeRule(rule);
+  }
+}
+
+function scheduleComputeRefresh() {
+  if (computeRefreshTimer) return;
+  computeRefreshTimer = setTimeout(refreshComputeRules, 100);
+}
+
 function observePageChanges() {
   if (observer) observer.disconnect();
   observer = new MutationObserver((mutations) => {
@@ -468,6 +569,7 @@ function observePageChanges() {
     }
     if (!mutationTimer) mutationTimer = setTimeout(flushPendingNodes, 50);
     scheduleRenderedScopeRefresh();
+    scheduleComputeRefresh();
   });
   observer.observe(document.body, {
     childList: true,
@@ -485,6 +587,7 @@ async function refresh() {
   replaceInEditables();
   observePageChanges();
   refreshRenderedScopes();
+  refreshComputeRules();
 }
 
 // ══════════════════════════════════════════════════════
@@ -492,6 +595,10 @@ async function refresh() {
 // ══════════════════════════════════════════════════════
 let pickMode = false;
 let pickHighlight = null;
+let pickMulti = false;
+let pickedSelectors = [];
+let pickToolbar = null;
+let pickedOverlays = [];
 
 const STABLE_ATTRS = [
   "data-testid",
@@ -757,19 +864,154 @@ function onPickMouseMove(e) {
 }
 
 function onPickClick(e) {
-  if (e.target === pickHighlight) return;
+  if (e.target === pickHighlight || isPickToolbar(e.target)) return;
   e.preventDefault();
   e.stopPropagation();
+  if (pickMulti) {
+    const selector = generateSelector(e.target);
+    if (selector && !pickedSelectors.includes(selector)) {
+      pickedSelectors.push(selector);
+      addPickedOverlay(e.target, pickedSelectors.length);
+      updatePickToolbar();
+    }
+    return;
+  }
   exitPickMode(generateSelector(e.target));
 }
 
 function onPickKeyDown(e) {
-  if (e.key === "Escape") exitPickMode(null);
+  if (e.key === "Escape") {
+    if (pickMulti) finishMultiPick(false);
+    else exitPickMode(null);
+  } else if (e.key === "Enter" && pickMulti) {
+    finishMultiPick(true);
+  }
 }
 
-function enterPickMode() {
+function isPickToolbar(el) {
+  return !!(pickToolbar && el && pickToolbar.contains(el));
+}
+
+function addPickedOverlay(el, n) {
+  const r = el.getBoundingClientRect();
+  const box = document.createElement("div");
+  box.style.cssText = [
+    "position:fixed",
+    `top:${r.top}px`,
+    `left:${r.left}px`,
+    `width:${r.width}px`,
+    `height:${r.height}px`,
+    "pointer-events:none",
+    "border:2px solid #16a34a",
+    "background:rgba(22,163,74,0.12)",
+    "border-radius:3px",
+    "z-index:2147483645",
+    "box-sizing:border-box",
+  ].join(";");
+  const tag = document.createElement("span");
+  tag.textContent = String(n);
+  tag.style.cssText = [
+    "position:absolute",
+    "top:-9px",
+    "left:-9px",
+    "min-width:18px",
+    "height:18px",
+    "padding:0 4px",
+    "border-radius:9px",
+    "background:#16a34a",
+    "color:#fff",
+    "font:600 11px/18px system-ui,sans-serif",
+    "text-align:center",
+  ].join(";");
+  box.appendChild(tag);
+  document.body.appendChild(box);
+  pickedOverlays.push(box);
+}
+
+function buildPickToolbar() {
+  pickToolbar = document.createElement("div");
+  pickToolbar.id = "__SuperTextSwap_picktoolbar__";
+  pickToolbar.style.cssText = [
+    "position:fixed",
+    "top:16px",
+    "left:50%",
+    "transform:translateX(-50%)",
+    "z-index:2147483647",
+    "display:flex",
+    "gap:8px",
+    "align-items:center",
+    "background:#111827",
+    "color:#fff",
+    "padding:8px 10px",
+    "border-radius:10px",
+    "font:13px/1 system-ui,sans-serif",
+    "box-shadow:0 6px 24px rgba(0,0,0,0.35)",
+  ].join(";");
+
+  const label = document.createElement("span");
+  label.id = "__SuperTextSwap_pickcount__";
+  label.textContent = msg("pickMultiCount", "0");
+  label.style.cssText = "margin-right:4px;white-space:nowrap";
+
+  const doneBtn = document.createElement("button");
+  doneBtn.textContent = msg("pickDoneBtn");
+  doneBtn.style.cssText = btnStyle("#2563eb");
+  doneBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    finishMultiPick(true);
+  });
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.textContent = msg("pickCancelBtn");
+  cancelBtn.style.cssText = btnStyle("#4b5563");
+  cancelBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    finishMultiPick(false);
+  });
+
+  pickToolbar.append(label, doneBtn, cancelBtn);
+  document.body.appendChild(pickToolbar);
+}
+
+function btnStyle(bg) {
+  return [
+    "border:0",
+    "cursor:pointer",
+    "padding:5px 12px",
+    "border-radius:7px",
+    "font:600 12px/1 system-ui,sans-serif",
+    "color:#fff",
+    `background:${bg}`,
+  ].join(";");
+}
+
+function updatePickToolbar() {
+  const label = document.getElementById("__SuperTextSwap_pickcount__");
+  if (label) label.textContent = msg("pickMultiCount", String(pickedSelectors.length));
+}
+
+function cleanupPickMode() {
+  pickMode = false;
+  pickMulti = false;
+  document.body.style.cursor = "";
+  pickHighlight?.remove();
+  pickHighlight = null;
+  pickToolbar?.remove();
+  pickToolbar = null;
+  pickedOverlays.forEach((o) => o.remove());
+  pickedOverlays = [];
+  document.removeEventListener("mousemove", onPickMouseMove, true);
+  document.removeEventListener("click", onPickClick, true);
+  document.removeEventListener("keydown", onPickKeyDown, true);
+}
+
+function startPickMode(multi) {
   if (pickMode) return;
   pickMode = true;
+  pickMulti = !!multi;
+  pickedSelectors = [];
   document.body.style.cursor = "crosshair";
 
   pickHighlight = document.createElement("div");
@@ -789,17 +1031,24 @@ function enterPickMode() {
   document.addEventListener("click", onPickClick, true);
   document.addEventListener("keydown", onPickKeyDown, true);
 
-  showPageToast(msg("pickPrompt"));
+  if (pickMulti) {
+    buildPickToolbar();
+    showPageToast(msg("pickPromptMulti"));
+  } else {
+    showPageToast(msg("pickPrompt"));
+  }
+}
+
+function enterPickMode() {
+  startPickMode(false);
+}
+
+function enterMultiPickMode() {
+  startPickMode(true);
 }
 
 async function exitPickMode(selector) {
-  pickMode = false;
-  document.body.style.cursor = "";
-  pickHighlight?.remove();
-  pickHighlight = null;
-  document.removeEventListener("mousemove", onPickMouseMove, true);
-  document.removeEventListener("click", onPickClick, true);
-  document.removeEventListener("keydown", onPickKeyDown, true);
+  cleanupPickMode();
 
   if (selector) {
     await chrome.storage.local.set({ pendingSelector: selector });
@@ -808,6 +1057,21 @@ async function exitPickMode(selector) {
       .sendMessage({ type: "TEXT_SWAP_OPEN_POPUP" })
       .catch(() => {});
     showPageToast(msg("pickDone", selector));
+  } else {
+    showPageToast(msg("pickCancel"));
+  }
+}
+
+async function finishMultiPick(confirm) {
+  const selectors = pickedSelectors.slice();
+  cleanupPickMode();
+
+  if (confirm && selectors.length) {
+    await chrome.storage.local.set({ pendingSources: selectors });
+    chrome.runtime
+      .sendMessage({ type: "TEXT_SWAP_OPEN_POPUP" })
+      .catch(() => {});
+    showPageToast(msg("pickMultiDone", String(selectors.length)));
   } else {
     showPageToast(msg("pickCancel"));
   }
@@ -987,6 +1251,9 @@ window.__SuperTextSwapMessageHandler = (message) => {
     message.type === "TEXT_SWAP_PICK_START_V2"
   ) {
     loadRules().then(enterPickMode);
+  }
+  if (message.type === "TEXT_SWAP_PICK_START_MULTI") {
+    loadRules().then(enterMultiPickMode);
   }
   if (message.type === "TEXT_SWAP_APPLY_TEMP") applyTempRules(message.rules);
   if (message.type === "TEXT_SWAP_APPLY_PUNCT") {

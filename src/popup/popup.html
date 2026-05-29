@@ -245,6 +245,31 @@
         flex-direction: column;
         gap: 6px;
       }
+      .feature-divider {
+        height: 1px;
+        background: #e2e8f0;
+        margin: 2px 0;
+      }
+      .compute-line {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .compute-select {
+        font-size: 12px;
+        padding: 3px 6px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        background: #fff;
+        color: #334155;
+        cursor: pointer;
+      }
+      .compute-hint {
+        font-size: 11px;
+        color: #94a3b8;
+        line-height: 1.5;
+      }
 
       /* ── Advanced toggle ── */
       .advanced-toggle {
@@ -775,6 +800,44 @@
               step="0.01"
               placeholder="最大增加"
             />
+          </div>
+        </div>
+
+        <div class="feature-divider"></div>
+
+        <div class="feature-options-title" id="computeTitle">
+          数字/金额自动计算
+        </div>
+        <div class="feature-options-row">
+          <div class="compute-line">
+            <label class="checkbox-label">
+              <input type="checkbox" id="computeEnabled" />
+              <span id="computeEnabledLabel">启用</span>
+            </label>
+            <select id="computeOp" class="compute-select">
+              <option value="sum">求和</option>
+              <option value="avg">平均值</option>
+              <option value="min">最小值</option>
+              <option value="max">最大值</option>
+              <option value="count">计数</option>
+            </select>
+            <label class="checkbox-label">
+              <input type="checkbox" id="computeKeepFormat" checked />
+              <span id="computeKeepFormatLabel">保留原格式</span>
+            </label>
+          </div>
+          <div class="selector-row">
+            <input
+              class="scope-input"
+              type="text"
+              id="computeSourcesDisplay"
+              readonly
+              placeholder="未选择来源元素"
+            />
+            <button class="btn-pick" id="computeSourcesPickBtn">⊕ 拾取来源</button>
+          </div>
+          <div class="compute-hint" id="computeHint">
+            结果写入下方「仅在此元素内生效」拾取的元素
           </div>
         </div>
       </div>

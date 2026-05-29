@@ -44,6 +44,40 @@
   "incrementMaxPh": { "message": "Max increase" },
   "refreshIncrementLabel": { "message": "Reset on refresh" },
 
+  "computeTitle": { "message": "Auto Calculate (Number / Amount)" },
+  "computeEnabledLabel": { "message": "Enable" },
+  "computeKeepFormatLabel": { "message": "Keep original format" },
+  "computeHint": { "message": "Result is written into the element picked in \"Limit to element\" below" },
+  "computeSourcesPickBtn": { "message": "⊕ Pick sources" },
+  "computeSourcesPh": { "message": "No source elements selected" },
+  "computeSourcesCount": {
+    "message": "$N$ sources",
+    "placeholders": { "n": { "content": "$1" } }
+  },
+  "computeOp_sum": { "message": "Sum" },
+  "computeOp_avg": { "message": "Average" },
+  "computeOp_min": { "message": "Min" },
+  "computeOp_max": { "message": "Max" },
+  "computeOp_count": { "message": "Count" },
+  "badgeCompute": { "message": "auto-calc" },
+  "toastComputeNeedSources": { "message": "Pick source elements first" },
+  "toastComputeNeedTarget": { "message": "Pick a result element in \"Limit to element\" first" },
+  "toastSourcesFilled": {
+    "message": "Added $N$ source elements",
+    "placeholders": { "n": { "content": "$1" } }
+  },
+  "pickPromptMulti": { "message": "Click each source element  ·  click \"Done\" above when finished  ·  Esc to cancel" },
+  "pickMultiCount": {
+    "message": "$N$ selected",
+    "placeholders": { "n": { "content": "$1" } }
+  },
+  "pickMultiDone": {
+    "message": "Selected $N$ sources  ·  Reopen the extension popup",
+    "placeholders": { "n": { "content": "$1" } }
+  },
+  "pickDoneBtn": { "message": "Done" },
+  "pickCancelBtn": { "message": "Cancel" },
+
   "addBtn": { "message": "Add Rule" },
   "clearBtn": { "message": "Clear All" },
   "rulesTitle": { "message": "Rules" },
@@ -134,6 +168,11 @@
 
   "helpS7Title": { "message": "Random Number / Amount Increase" },
   "helpS7Desc": {
-    "message": "Enable this under Features to automatically match numbers and amounts on the page, then randomly increase them within the configured range. Values are cached, so page refreshes stay consistent. Refresh Increments clears the cache and reloads the current page to draw new values."
+    "message": "Enable this under \"Random Number / Amount Increase\" to automatically match numbers and amounts on the page and increase them randomly within the configured range. By default the increment is cached so refreshes stay consistent. With \"Reset on refresh\" checked, each page refresh reads the last cached value and increases it again on top (accumulates). \"Refresh Increments\" clears the cache and reloads the page to regenerate."
+  },
+
+  "helpS8Title": { "message": "Auto Calculate (Number / Amount)" },
+  "helpS8Desc": {
+    "message": "Enable \"Auto Calculate\" and choose an operation (Sum / Average / Min / Max / Count). Click \"⊕ Pick sources\" and click each source element on the page, then finish; next, pick a result element under \"Limit to element\". The extension collects the numbers from the sources, computes the result, and writes it into the result element: decimals follow the source with the most decimal places, and \"Keep original format\" reuses the source's currency symbol and thousands separators. The result recalculates automatically when the source numbers change."
   }
 }
