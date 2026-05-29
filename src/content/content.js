@@ -1,10 +1,24 @@
 (function () {
+// Guard against re-injection: the popup re-runs this file via executeScript
+// (e.g. when starting the element picker) on top of the manifest-injected
+// instance. Running a second time would spin up a duplicate MutationObserver
+// and re-run init(), which together cause a runaway increment loop. If an
+// instance is already live, the existing message handler keeps serving, so we
+// simply bail out here.
+if (window.__SuperTextSwapLoaded) return;
+window.__SuperTextSwapLoaded = true;
+
 let currentRules = [];
 let observer = null;
 let processedMark = new WeakMap();
 let uiLang = "zh_CN";
 let incrementCache = {};
 let incrementCacheTimer = null;
+// Per page-load session: the increment value chosen for each refresh-increment
+// slot this session. Persisted cache accumulates across reloads; this map keeps
+// the value stable within a single session so re-renders / observer callbacks
+// don't re-trigger the increment (which would loop endlessly).
+let sessionIncrement = {};
 
 const SKIP_TAGS = new Set([
   "SCRIPT",
@@ -127,9 +141,10 @@ function getRefreshIncrementValue(rule, parsed, index) {
     return parsed.value;
 
   const key = makeIncrementRecordKey(rule, index);
-  const record = incrementCache[key];
-  if (record && typeof record.value === "number" && parsed.value === record.value)
-    return parsed.value;
+
+  // Already decided for this session → return the same value so re-renders and
+  // observer callbacks don't re-increment (which would loop without end).
+  if (typeof sessionIncrement[key] === "number") return sessionIncrement[key];
 
   const low = Math.min(min, max);
   const high = Math.max(min, max);
@@ -138,10 +153,14 @@ function getRefreshIncrementValue(rule, parsed, index) {
     String(low).split(".")[1]?.length || 0,
     String(high).split(".")[1]?.length || 0,
   );
+  // Accumulate on refresh: read the previously cached value and increment it.
+  // First time ever (no cache), start from the value currently on the page.
+  const record = incrementCache[key];
   const base =
     record && typeof record.value === "number" ? record.value : parsed.value;
   const delta = Number((low + Math.random() * (high - low)).toFixed(decimalPlaces));
   const value = Number((base + delta).toFixed(decimalPlaces));
+  sessionIncrement[key] = value;
   incrementCache[key] = { value, updatedAt: Date.now() };
   scheduleIncrementCacheSave();
   return value;
@@ -959,6 +978,7 @@ window.__SuperTextSwapMessageHandler = (message) => {
   if (message.type === "TEXT_SWAP_RULES_UPDATED") refresh();
   if (message.type === "TEXT_SWAP_INCREMENT_CACHE_CLEARED") {
     incrementCache = {};
+    sessionIncrement = {};
     processedMark = new WeakMap();
     refresh();
   }

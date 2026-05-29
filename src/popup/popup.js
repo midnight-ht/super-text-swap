@@ -537,18 +537,19 @@ async function saveRules() { await chrome.storage.sync.set({ rules }); }
 async function notifyPageRefresh() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) return;
-  const sendRefresh = () =>
-    chrome.tabs.sendMessage(tab.id, { type: 'TEXT_SWAP_RULES_UPDATED' });
+  // Ensure the content script is present (no-op if already injected), then
+  // always tell it to re-apply. Re-injection itself is a no-op now that the
+  // content script guards against duplicate instances, so the message is what
+  // actually triggers the refresh.
   try {
     await chrome.scripting.executeScript({
       target: { tabId: tab.id, allFrames: true },
       files: ['src/content/content.js'],
     });
-  } catch {
-    try {
-      await sendRefresh();
-    } catch {}
-  }
+  } catch {}
+  try {
+    await chrome.tabs.sendMessage(tab.id, { type: 'TEXT_SWAP_RULES_UPDATED' });
+  } catch {}
 }
 
 async function addRule() {
