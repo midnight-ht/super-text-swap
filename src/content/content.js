@@ -1,3 +1,4 @@
+(function () {
 let currentRules = [];
 let observer = null;
 let processedMark = new WeakMap();
@@ -87,6 +88,18 @@ function makeIncrementCacheKey(rule, match, token, index) {
   ].join("::");
 }
 
+function makeIncrementRecordKey(rule, index) {
+  return [
+    "record",
+    location.hostname,
+    location.pathname,
+    rule.id || rule.from,
+    rule.updatedAt || rule.createdAt || "",
+    rule.scope?.domSelector || "",
+    index,
+  ].join("::");
+}
+
 function getCachedIncrement(rule, match, token, index) {
   const config = rule.valueTransform;
   const min = Number(config?.min);
@@ -106,6 +119,34 @@ function getCachedIncrement(rule, match, token, index) {
   return delta;
 }
 
+function getRefreshIncrementValue(rule, parsed, index) {
+  const config = rule.valueTransform;
+  const min = Number(config?.min);
+  const max = Number(config?.max);
+  if (!config?.enabled || !Number.isFinite(min) || !Number.isFinite(max))
+    return parsed.value;
+
+  const key = makeIncrementRecordKey(rule, index);
+  const record = incrementCache[key];
+  if (record && typeof record.value === "number" && parsed.value === record.value)
+    return parsed.value;
+
+  const low = Math.min(min, max);
+  const high = Math.max(min, max);
+  const decimalPlaces = Math.max(
+    parsed.decimal,
+    String(low).split(".")[1]?.length || 0,
+    String(high).split(".")[1]?.length || 0,
+  );
+  const base =
+    record && typeof record.value === "number" ? record.value : parsed.value;
+  const delta = Number((low + Math.random() * (high - low)).toFixed(decimalPlaces));
+  const value = Number((base + delta).toFixed(decimalPlaces));
+  incrementCache[key] = { value, updatedAt: Date.now() };
+  scheduleIncrementCacheSave();
+  return value;
+}
+
 function applyValueTransform(replacement, rule, match) {
   if (!rule.valueTransform?.enabled) return replacement;
   let tokenIndex = 0;
@@ -114,13 +155,16 @@ function applyValueTransform(replacement, rule, match) {
     (token) => {
       const parsed = normalizeNumberToken(token);
       if (!parsed) return token;
-      const delta = getCachedIncrement(rule, match, token, tokenIndex++);
+      const index = tokenIndex++;
+      const nextValue = rule.valueTransform.refreshIncrement
+        ? getRefreshIncrementValue(rule, parsed, index)
+        : parsed.value + getCachedIncrement(rule, match, token, index);
       const decimal = Math.max(
         parsed.decimal,
         String(rule.valueTransform.min).split(".")[1]?.length || 0,
         String(rule.valueTransform.max).split(".")[1]?.length || 0,
       );
-      return formatNumberLike(token, parsed.value + delta, decimal);
+      return formatNumberLike(token, nextValue, decimal);
     },
   );
 }
@@ -165,7 +209,15 @@ let uiMessages = {};
 
 async function loadUIMessages(locale) {
   try {
+    if (!chrome.runtime?.id) {
+      uiMessages = {};
+      return;
+    }
     const url = chrome.runtime.getURL(`_locales/${locale}/messages.json`);
+    if (!url || url.includes("://invalid/")) {
+      uiMessages = {};
+      return;
+    }
     uiMessages = await (await fetch(url)).json();
   } catch {
     uiMessages = {};
@@ -235,11 +287,7 @@ function applyRules(text, anchorEl, ruleSet) {
   for (const rule of ruleSet) {
     if (!rule.from && rule.type !== "number") continue;
     if (rule.scope?.domSelector) {
-      try {
-        if (!anchorEl?.closest(rule.scope.domSelector)) continue;
-      } catch {
-        continue;
-      }
+      if (!matchesDomScope(anchorEl, rule.scope.domSelector)) continue;
     }
     result = applyRuleToText(result, rule);
   }
@@ -276,6 +324,44 @@ function walkAndReplace(root = document.body) {
   while ((node = walker.nextNode())) replaceTextNode(node);
 }
 
+function replaceTextNodeWithRules(node, ruleSet) {
+  if (shouldSkipNode(node)) return;
+  const original = node.nodeValue;
+  if (!original || !original.trim()) return;
+  if (processedMark.get(node) === original) return;
+
+  let replaced = original;
+  for (const rule of ruleSet) {
+    if (!rule.from && rule.type !== "number") continue;
+    replaced = applyRuleToText(replaced, rule);
+  }
+
+  if (replaced !== original) {
+    node.nodeValue = replaced;
+    processedMark.set(node, replaced);
+  } else {
+    processedMark.set(node, original);
+  }
+}
+
+function walkAndReplaceWithRules(root, ruleSet) {
+  if (!root || !ruleSet.length) return;
+  if (root.nodeType === Node.TEXT_NODE) {
+    replaceTextNodeWithRules(root, ruleSet);
+    return;
+  }
+  if (root.nodeType !== Node.ELEMENT_NODE) return;
+
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: (node) =>
+      shouldSkipNode(node)
+        ? NodeFilter.FILTER_REJECT
+        : NodeFilter.FILTER_ACCEPT,
+  });
+  let node;
+  while ((node = walker.nextNode())) replaceTextNodeWithRules(node, ruleSet);
+}
+
 // ── Input / textarea replacement ───────────────────────
 function replaceInInputs() {
   const inputRules = currentRules.filter((r) => r.scope?.includeInputs);
@@ -308,6 +394,7 @@ function replaceInEditables() {
 // ── MutationObserver with throttle ────────────────────
 let mutationTimer = null;
 const pendingNodes = [];
+let scopeRefreshTimer = null;
 
 function flushPendingNodes() {
   mutationTimer = null;
@@ -318,14 +405,56 @@ function flushPendingNodes() {
   }
 }
 
+function getDomScopeNodes(scopeSelector) {
+  const selector = String(scopeSelector || "").trim();
+  if (!selector) return [];
+  if (selector.startsWith("xpath=") || selector.startsWith("/")) {
+    return getXPathScopeNodes(selector);
+  }
+  try {
+    return Array.from(document.querySelectorAll(selector));
+  } catch {
+    return [];
+  }
+}
+
+function refreshRenderedScopes() {
+  scopeRefreshTimer = null;
+  const scopedRules = currentRules.filter((rule) => rule.scope?.domSelector);
+  if (!scopedRules.length) return;
+
+  for (const rule of scopedRules) {
+    const nodes = getDomScopeNodes(rule.scope.domSelector);
+    for (const node of nodes) {
+      if (!node) continue;
+      walkAndReplaceWithRules(node, [rule]);
+    }
+  }
+}
+
+function scheduleRenderedScopeRefresh() {
+  if (scopeRefreshTimer) return;
+  scopeRefreshTimer = setTimeout(refreshRenderedScopes, 80);
+}
+
 function observePageChanges() {
   if (observer) observer.disconnect();
   observer = new MutationObserver((mutations) => {
-    for (const m of mutations)
+    for (const m of mutations) {
+      if (m.type === "characterData") {
+        pendingNodes.push(m.target);
+        continue;
+      }
       for (const n of m.addedNodes) pendingNodes.push(n);
+    }
     if (!mutationTimer) mutationTimer = setTimeout(flushPendingNodes, 50);
+    scheduleRenderedScopeRefresh();
   });
-  observer.observe(document.body, { childList: true, subtree: true });
+  observer.observe(document.body, {
+    childList: true,
+    characterData: true,
+    subtree: true,
+  });
 }
 
 // ── Full refresh ───────────────────────────────────────
@@ -336,6 +465,7 @@ async function refresh() {
   replaceInInputs();
   replaceInEditables();
   observePageChanges();
+  refreshRenderedScopes();
 }
 
 // ══════════════════════════════════════════════════════
@@ -344,16 +474,195 @@ async function refresh() {
 let pickMode = false;
 let pickHighlight = null;
 
-function generateSelector(el) {
-  if (!el || el === document.body) return "body";
-  if (el.id) return `#${CSS.escape(el.id)}`;
+const STABLE_ATTRS = [
+  "data-testid",
+  "data-test",
+  "data-cy",
+  "data-qa",
+  "aria-label",
+  "name",
+  "title",
+  "placeholder",
+  "alt",
+];
 
-  const classes = Array.from(el.classList).filter(
-    (c) => c.length > 1 && !/^\d/.test(c),
+function cssString(value) {
+  return `"${String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
+function isLikelyHashedToken(token) {
+  if (!token || token.length <= 1 || /^\d/.test(token)) return true;
+
+  const value = String(token);
+  const lower = value.toLowerCase();
+  if (/^(css|jss|jsx|emotion|styled|sc|makeStyles|mui|chakra)-/i.test(value)) return true;
+  if (/^(__|ng-|svelte-|astro-|v-)/i.test(value)) return true;
+
+  const chunks = value.split(/[_-]/).filter(Boolean);
+  if (
+    chunks.length >= 3 &&
+    chunks.some((part, index) => /^\d+$/.test(part) && index > 0 && index < chunks.length - 1) &&
+    /[a-z]/.test(value) &&
+    /[A-Z]/.test(value)
+  ) {
+    return true;
+  }
+
+  const hasHashChunk = chunks.some(
+    (part) =>
+      part.length >= 5 &&
+      ((/[a-z]/i.test(part) && /\d/.test(part)) ||
+        (/[a-z]/.test(part) && /[A-Z]/.test(part))) &&
+      /^[a-z0-9]+$/i.test(part),
   );
+  if (hasHashChunk) return true;
+
+  if (value.length >= 8 && /^[a-z0-9_-]+$/i.test(value)) {
+    const letters = (value.match(/[a-z]/gi) || []).length;
+    const digits = (value.match(/\d/g) || []).length;
+    if (letters >= 3 && digits >= 3) return true;
+  }
+
+  return /(?:^|[-_])(hash|hashed|module|generated|random)(?:[-_]|$)/.test(lower);
+}
+
+function getStableAttrSelector(el) {
+  for (const attr of STABLE_ATTRS) {
+    const value = el.getAttribute(attr);
+    if (value && value.trim() && value.length <= 80) {
+      return `[${attr}=${cssString(value.trim())}]`;
+    }
+  }
+  return "";
+}
+
+function getNthOfType(el) {
+  let index = 1;
+  let sibling = el.previousElementSibling;
+  while (sibling) {
+    if (sibling.tagName === el.tagName) index += 1;
+    sibling = sibling.previousElementSibling;
+  }
+  return `${el.tagName.toLowerCase()}:nth-of-type(${index})`;
+}
+
+function getElementXPath(el) {
+  const segments = [];
+  let node = el;
+  while (node && node.nodeType === Node.ELEMENT_NODE) {
+    const tag = node.tagName.toLowerCase();
+    let index = 1;
+    let sibling = node.previousElementSibling;
+    while (sibling) {
+      if (sibling.tagName === node.tagName) index += 1;
+      sibling = sibling.previousElementSibling;
+    }
+    segments.unshift(`${tag}[${index}]`);
+    node = node.parentElement;
+  }
+  return `xpath=/${segments.join("/")}`;
+}
+
+function getXPathLiteral(text) {
+  const value = String(text);
+  if (!value.includes("'")) return `'${value}'`;
+  if (!value.includes('"')) return `"${value}"`;
+  return `concat('${value.split("'").join(`', "'", '`)}')`;
+}
+
+function getOwnText(el) {
+  if (!el?.childNodes) return "";
+  return Array.from(el.childNodes)
+    .filter((node) => node.nodeType === Node.TEXT_NODE)
+    .map((node) => node.nodeValue.trim())
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isStableTextAnchor(text) {
+  if (!text || text.length > 60) return false;
+  return /[\p{L}\u4e00-\u9fff]/u.test(text);
+}
+
+function getTextAnchoredXPath(el) {
+  const tag = el.tagName.toLowerCase();
+  const prevText = getOwnText(el.previousElementSibling || {});
+  if (isStableTextAnchor(prevText)) {
+    return `xpath=//*[normalize-space()=${getXPathLiteral(prevText)}]/following-sibling::${tag}[1]`;
+  }
+
+  const parent = el.parentElement;
+  if (!parent) return "";
+
+  const siblings = Array.from(parent.children);
+  const index = siblings.indexOf(el);
+  const anchor = siblings
+    .slice(0, Math.max(index, 0))
+    .reverse()
+    .find((node) => isStableTextAnchor(getOwnText(node)));
+
+  if (anchor) {
+    const anchorText = getOwnText(anchor);
+    const distance = siblings.indexOf(el) - siblings.indexOf(anchor);
+    return `xpath=//*[normalize-space()=${getXPathLiteral(anchorText)}]/following-sibling::*[${distance}]`;
+  }
+
+  return "";
+}
+
+function getXPathScopeNodes(scopeSelector) {
+  const raw = String(scopeSelector || "").trim();
+  const hasPrefix = raw.startsWith("xpath=");
+  const xpath = hasPrefix ? raw.slice(6).trim() : raw;
+  if (!xpath || (!hasPrefix && !xpath.startsWith("/"))) return [];
+  try {
+    const result = document.evaluate(
+      xpath,
+      document,
+      null,
+      XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+      null,
+    );
+    const nodes = [];
+    for (let i = 0; i < result.snapshotLength; i++) {
+      nodes.push(result.snapshotItem(i));
+    }
+    return nodes;
+  } catch {
+    return [];
+  }
+}
+
+function matchesDomScope(anchorEl, scopeSelector) {
+  if (!anchorEl || !scopeSelector) return false;
+  const selector = String(scopeSelector).trim();
+  if (!selector) return true;
+
+  if (selector.startsWith("xpath=") || selector.startsWith("/")) {
+    return getXPathScopeNodes(selector).some(
+      (scopeNode) => scopeNode === anchorEl || scopeNode.contains(anchorEl),
+    );
+  }
+
+  try {
+    return !!anchorEl.closest(selector);
+  } catch {
+    return false;
+  }
+}
+
+function getSelectorSegment(el, preferBroad = false) {
+  const tag = el.tagName.toLowerCase();
+  const stableAttr = getStableAttrSelector(el);
+  if (stableAttr) return preferBroad ? stableAttr : `${tag}${stableAttr}`;
+
+  if (el.id && !isLikelyHashedToken(el.id)) return `#${CSS.escape(el.id)}`;
+
+  const classes = Array.from(el.classList).filter((c) => !isLikelyHashedToken(c));
   if (classes.length) {
     return (
-      el.tagName.toLowerCase() +
+      tag +
       classes
         .slice(0, 2)
         .map((c) => `.${CSS.escape(c)}`)
@@ -361,20 +670,30 @@ function generateSelector(el) {
     );
   }
 
+  return getNthOfType(el);
+}
+
+function generateSelector(el) {
+  if (!el || el === document.body) return "body";
+
+  if (
+    (el.id && isLikelyHashedToken(el.id)) ||
+    Array.from(el.classList).some(isLikelyHashedToken)
+  ) {
+    return getTextAnchoredXPath(el) || getElementXPath(el);
+  }
+
+  const direct = getSelectorSegment(el, true);
+  if (!direct.includes(":nth-of-type")) return direct;
+
   const segments = [];
   let node = el;
   while (node && node !== document.documentElement && segments.length < 4) {
-    if (node.id) {
+    if (node.id && !isLikelyHashedToken(node.id)) {
       segments.unshift(`#${CSS.escape(node.id)}`);
       break;
     }
-    const tag = node.tagName.toLowerCase();
-    const cls = Array.from(node.classList)
-      .filter((c) => c.length > 1 && !/^\d/.test(c))
-      .slice(0, 1)
-      .map((c) => `.${CSS.escape(c)}`)
-      .join("");
-    segments.unshift(cls ? `${tag}${cls}` : tag);
+    segments.unshift(getSelectorSegment(node));
     node = node.parentElement;
   }
   return segments.join(" > ") || el.tagName.toLowerCase();
@@ -582,11 +901,8 @@ function applyZhQuoteParser(scope) {
         if (el.isContentEditable && !scope?.includeEditable)
           return NodeFilter.FILTER_REJECT;
         if (scope?.domSelector) {
-          try {
-            if (!el.closest(scope.domSelector)) return NodeFilter.FILTER_REJECT;
-          } catch {
+          if (!matchesDomScope(el, scope.domSelector))
             return NodeFilter.FILTER_REJECT;
-          }
         }
         return NodeFilter.FILTER_ACCEPT;
       },
@@ -635,19 +951,31 @@ function applyZhQuoteParser(scope) {
 }
 
 // ── Message listener ───────────────────────────────────
-chrome.runtime.onMessage.addListener((message) => {
+if (window.__SuperTextSwapMessageHandler) {
+  chrome.runtime.onMessage.removeListener(window.__SuperTextSwapMessageHandler);
+}
+
+window.__SuperTextSwapMessageHandler = (message) => {
   if (message.type === "TEXT_SWAP_RULES_UPDATED") refresh();
   if (message.type === "TEXT_SWAP_INCREMENT_CACHE_CLEARED") {
     incrementCache = {};
     processedMark = new WeakMap();
     refresh();
   }
-  if (message.type === "TEXT_SWAP_PICK_START") loadRules().then(enterPickMode);
+  if (
+    message.type === "TEXT_SWAP_PICK_START" ||
+    message.type === "TEXT_SWAP_PICK_START_V2"
+  ) {
+    loadRules().then(enterPickMode);
+  }
   if (message.type === "TEXT_SWAP_APPLY_TEMP") applyTempRules(message.rules);
   if (message.type === "TEXT_SWAP_APPLY_PUNCT") {
     applyTempRules(message.rules); // simple rules first (brackets, punctuation)
     if (message.direction === "zh") applyZhQuoteParser(message.scope);
   }
-});
+};
+
+chrome.runtime.onMessage.addListener(window.__SuperTextSwapMessageHandler);
 
 refresh();
+})();

@@ -221,14 +221,17 @@
       }
 
       .feature-options {
+        display: none;
         background: #f8fafc;
         border: 1px solid #e2e8f0;
         border-radius: 8px;
         padding: 9px 10px;
         margin: 8px 0 6px;
-        display: flex;
         flex-direction: column;
         gap: 8px;
+      }
+      .feature-options.open {
+        display: flex;
       }
       .feature-options-title {
         font-size: 11px;
@@ -742,12 +745,21 @@
         <input type="text" id="toInput" placeholder="输入替换后的文本" />
       </div>
 
-      <div class="feature-options">
-        <div class="feature-options-title" id="featureTitle">功能</div>
+      <div class="advanced-toggle" id="featureToggle">
+        <span class="toggle-icon open" id="featureToggleIcon">▾</span>
+        <span id="featureToggleText">拓展功能</span>
+      </div>
+
+      <div class="feature-options open" id="featureSection">
+        <div class="feature-options-title" id="featureTitle">数字/金额随机增加</div>
         <div class="feature-options-row">
           <label class="checkbox-label">
             <input type="checkbox" id="incrementEnabled" />
-            <span id="incrementEnabledLabel">数字 / 金额随机增加</span>
+            <span id="incrementEnabledLabel">启用</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="refreshIncrement" />
+            <span id="refreshIncrementLabel">刷新时重置</span>
           </label>
           <div class="number-range">
             <input

@@ -93,6 +93,8 @@ const rulesCount        = q('rulesCount');
 const toast             = q('toast');
 const advancedSection   = q('advancedSection');
 const toggleIcon        = q('toggleIcon');
+const featureSection    = q('featureSection');
+const featureToggleIcon = q('featureToggleIcon');
 const domainLabel       = q('domainLabel');
 const customUrlRow      = q('customUrlRow');
 const urlPatternInput   = q('urlPatternInput');
@@ -102,6 +104,7 @@ const includeEditableCb = q('includeEditable');
 const incrementEnabledCb = q('incrementEnabled');
 const incrementMinInput  = q('incrementMin');
 const incrementMaxInput  = q('incrementMax');
+const refreshIncrementCb = q('refreshIncrement');
 
 // ── Toast ──────────────────────────────────────────────
 let toastTimer = null;
@@ -134,6 +137,7 @@ function applyTranslations() {
   setHtml('regexHelpBubble',      'regexHelpHtml');
   setText('toLabel',              'toLabel');
   setPh  ('toInput',              'toPh');
+  setText('featureToggleText',    'featureToggleText');
   setText('advancedToggleText',   'advancedTitle');
   setText('urlScopeLabel',        'urlScopeLabel');
   setText('urlAll',               'urlAll');
@@ -150,6 +154,7 @@ function applyTranslations() {
   setText('incrementEnabledLabel','incrementEnabledLabel');
   setPh  ('incrementMin',         'incrementMinPh');
   setPh  ('incrementMax',         'incrementMaxPh');
+  setText('refreshIncrementLabel','refreshIncrementLabel');
   setText('addBtn',               'addBtn');
   setText('clearBtn',             'clearBtn');
   setText('rulesTitle',           'rulesTitle');
@@ -175,6 +180,11 @@ async function toggleLang() {
 q('advancedToggle').addEventListener('click', () => {
   const isOpen = advancedSection.classList.toggle('open');
   toggleIcon.classList.toggle('open', isOpen);
+});
+
+q('featureToggle').addEventListener('click', () => {
+  const isOpen = featureSection.classList.toggle('open');
+  featureToggleIcon.classList.toggle('open', isOpen);
 });
 
 document.querySelectorAll('input[name="urlMode"]').forEach(radio => {
@@ -239,6 +249,7 @@ async function restorePickerState() {
     incrementEnabledCb.checked  = !!s.incrementEnabled;
     incrementMinInput.value     = s.incrementMin || '';
     incrementMaxInput.value     = s.incrementMax || '';
+    refreshIncrementCb.checked  = !!s.refreshIncrement;
     await chrome.storage.local.remove(['pendingFormState']);
   }
 
@@ -269,16 +280,17 @@ q('pickBtn').addEventListener('click', async () => {
       incrementEnabled: incrementEnabledCb.checked,
       incrementMin:     incrementMinInput.value,
       incrementMax:     incrementMaxInput.value,
+      refreshIncrement: refreshIncrementCb.checked,
     },
   });
 
   const sendPick = () =>
-    chrome.tabs.sendMessage(tab.id, { type: 'TEXT_SWAP_PICK_START' });
+    chrome.tabs.sendMessage(tab.id, { type: 'TEXT_SWAP_PICK_START_V2' });
   try {
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['src/content/content.js'] });
     await sendPick();
   } catch {
     try {
-      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['src/content/content.js'] });
       await sendPick();
     } catch {
       showToast(t('toastNoPick'));
@@ -402,6 +414,8 @@ function getScopeBadgesHtml(rule) {
     parts.push(`<span class="badge badge-mode">${t('badgeNumberFeature')}</span>`);
   if (rule.valueTransform?.enabled)
     parts.push(`<span class="badge badge-mode">${t('badgeIncrement', formatIncrementRange(rule.valueTransform))}</span>`);
+  if (rule.valueTransform?.refreshIncrement)
+    parts.push(`<span class="badge badge-mode">${t('badgeRefreshIncrement')}</span>`);
   return parts.length ? `<div class="rule-badges">${parts.join('')}</div>` : '';
 }
 
@@ -415,6 +429,8 @@ function getRuleBadgesHtml(rule) {
     parts.push(`<span class="badge badge-mode">${t('badgeNumberFeature')}</span>`);
   if (rule.valueTransform?.enabled)
     parts.push(`<span class="badge badge-mode">${t('badgeIncrement', formatIncrementRange(rule.valueTransform))}</span>`);
+  if (rule.valueTransform?.refreshIncrement)
+    parts.push(`<span class="badge badge-mode">${t('badgeRefreshIncrement')}</span>`);
   return parts.length ? `<div class="rule-badges">${parts.join('')}</div>` : '';
 }
 
@@ -497,7 +513,7 @@ function readValueTransformFromForm() {
   const min = Number(incrementMinInput.value);
   const max = Number(incrementMaxInput.value);
   if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
-  return { enabled: true, min, max };
+  return { enabled: true, min, max, refreshIncrement: refreshIncrementCb.checked };
 }
 
 function resetForm() {
@@ -512,6 +528,7 @@ function resetForm() {
   incrementEnabledCb.checked = false;
   incrementMinInput.value    = '';
   incrementMaxInput.value    = '';
+  refreshIncrementCb.checked = false;
   fromInput.focus();
 }
 
@@ -520,11 +537,16 @@ async function saveRules() { await chrome.storage.sync.set({ rules }); }
 async function notifyPageRefresh() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) return;
+  const sendRefresh = () =>
+    chrome.tabs.sendMessage(tab.id, { type: 'TEXT_SWAP_RULES_UPDATED' });
   try {
-    await chrome.tabs.sendMessage(tab.id, { type: 'TEXT_SWAP_RULES_UPDATED' });
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id, allFrames: true },
+      files: ['src/content/content.js'],
+    });
   } catch {
     try {
-      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['src/content/content.js'] });
+      await sendRefresh();
     } catch {}
   }
 }
@@ -540,18 +562,18 @@ async function addRule() {
     incrementMinInput.focus();
     return;
   }
-  if (from && rules.find(r => r.from === from)) { showToast(t('toastExists')); return; }
+  if (!valueTransform && from && rules.find(r => r.from === from)) { showToast(t('toastExists')); return; }
   const now = Date.now();
   const scope = readScopeFromForm();
-  if (from) {
-    rules.push({ id: generateId(), from, to, type: inferRuleType(from), enabled: true,
-                 scope, createdAt: now, updatedAt: now });
-  }
   if (valueTransform) {
     rules.push({ id: generateId(), from: '', to: '', type: 'number', enabled: true,
                  valueTransform, scope, createdAt: now, updatedAt: now });
+  } else if (from) {
+    rules.push({ id: generateId(), from, to, type: inferRuleType(from), enabled: true,
+                 scope, createdAt: now, updatedAt: now });
   }
   await saveRules();
+  if (valueTransform) await chrome.storage.local.set({ incrementCache: {} });
   renderRules();
   resetForm();
   showToast(t('toastAdded'));
