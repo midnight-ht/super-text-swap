@@ -16,7 +16,11 @@
   "subtitle": { "message": "Web Text Replacer" },
 
   "fromLabel": { "message": "From" },
-  "fromPh": { "message": "Text to replace" },
+  "fromPh": { "message": "Plain text, or a regex pattern" },
+  "regexHelpBtn": { "message": "❓" },
+  "regexHelpHtml": {
+    "message": "<h3>Basic Match Rules</h3><ul><li><b>Exact match:</b> what you enter is what gets matched. <code>cat</code> only matches cat.</li><li><b>Any single character:</b> <code>.</code>, so <code>c.t</code> can match cat, cot, cut.</li><li><b>Any number of characters:</b> <code>.*</code>, so <code>c.*t</code> can match ct, cat, connect.</li></ul><h4>Common Regex Symbols</h4><table><tr><th>Symbol</th><th>Meaning</th><th>Example</th></tr><tr><td><code>\\d</code></td><td>Any digit</td><td><code>202\\d</code></td></tr><tr><td><code>\\w</code></td><td>Letter, digit, or underscore</td><td><code>user_\\w</code></td></tr><tr><td><code>^</code></td><td>Start of text</td><td><code>^Apple</code></td></tr><tr><td><code>$</code></td><td>End of text</td><td><code>End$</code></td></tr><tr><td><code>+</code></td><td>One or more</td><td><code>\\d+</code></td></tr><tr><td><code>?</code></td><td>Zero or one</td><td><code>apples?</code></td></tr></table>"
+  },
   "toLabel": { "message": "To" },
   "toPh": { "message": "Replacement text" },
 
@@ -30,8 +34,13 @@
   "domPh": { "message": "CSS selector (empty = entire page)" },
   "pickBtn": { "message": "⊕ Pick" },
   "targetLabel": { "message": "Extra Targets" },
+  "featureTitle": { "message": "Features" },
   "includeInputsLabel": { "message": "Input fields (input / textarea)" },
   "includeEditableLabel": { "message": "Rich text editor (contenteditable)" },
+  "numberTransformLabel": { "message": "Random Number / Amount Increase" },
+  "incrementEnabledLabel": { "message": "Random number / amount increase" },
+  "incrementMinPh": { "message": "Min increase" },
+  "incrementMaxPh": { "message": "Max increase" },
 
   "addBtn": { "message": "Add Rule" },
   "clearBtn": { "message": "Clear All" },
@@ -40,6 +49,12 @@
   "countSuffix": { "message": "" },
   "badgeInput": { "message": "input" },
   "badgeEditable": { "message": "rich-text" },
+  "badgeRegex": { "message": "regex" },
+  "badgeNumberFeature": { "message": "number/amount" },
+  "badgeIncrement": {
+    "message": "+$RANGE$",
+    "placeholders": { "range": { "content": "$1" } }
+  },
 
   "toastAdded": { "message": "Rule added" },
   "toastDeleted": { "message": "Rule deleted" },
@@ -50,7 +65,12 @@
   "toastNoPick": { "message": "Element picking not supported here" },
   "toastNoRules": { "message": "No rules to clear" },
   "toastExists": { "message": "Source text already exists" },
-  "toastFromRequired": { "message": "Please enter source text" },
+  "numberRuleFrom": { "message": "Auto-match numbers / amounts" },
+
+  "toastFromRequired": { "message": "Enter source text, or enable random number / amount increase" },
+  "toastRegexInvalid": { "message": "Invalid regular expression" },
+  "toastIncrementRangeRequired": { "message": "Enter a valid increase range" },
+  "toastIncrementRefreshed": { "message": "Increase cache refreshed" },
   "toastSelectorFilled": {
     "message": "Selector filled: $SELECTOR$",
     "placeholders": {
@@ -67,13 +87,14 @@
 
   "toastTempApplied": { "message": "Temporarily applied to page" },
   "toastTempFromRequired": {
-    "message": "Please enter source text before applying"
+    "message": "Enter source text, or enable random number / amount increase"
   },
   "toastPunctApplied": { "message": "Punctuation converted (temporary)" },
 
   "quickLabel": { "message": "Quick Actions" },
   "punctZhBtn": { "message": "→ Chinese Punct." },
   "punctEnBtn": { "message": "→ English Punct." },
+  "refreshIncrementBtn": { "message": "Refresh Increments" },
 
   "helpTitle": { "message": "How it works" },
   "helpClose": { "message": "Close" },
@@ -100,6 +121,16 @@
 
   "helpS5Title": { "message": "Rule List" },
   "helpS5Desc": {
-    "message": "Saved rules run in order. Click × to delete one, Clear All to remove all. Colored badges indicate a rule has URL or element scope restrictions."
+    "message": "Saved rules run in order. Click × to delete one, Clear All to remove all. Colored badges indicate scope or replacement mode."
+  },
+
+  "helpS6Title": { "message": "Regex Match" },
+  "helpS6Desc": {
+    "message": "The source text chooses the match mode automatically: plain text matches exactly; patterns containing ., .*, \\d, \\w, +, ?, and similar rules are treated as regular expressions."
+  },
+
+  "helpS7Title": { "message": "Random Number / Amount Increase" },
+  "helpS7Desc": {
+    "message": "Enable this under Features to automatically match numbers and amounts on the page, then randomly increase them within the configured range. Values are cached, so page refreshes stay consistent. Refresh Increments clears the cache and reloads the current page to draw new values."
   }
 }

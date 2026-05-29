@@ -2,6 +2,8 @@ let currentRules = [];
 let observer = null;
 let processedMark = new WeakMap();
 let uiLang = "zh_CN";
+let incrementCache = {};
+let incrementCacheTimer = null;
 
 const SKIP_TAGS = new Set([
   "SCRIPT",
@@ -42,6 +44,120 @@ function smartReplace(text, from, to) {
     default:
       return text.split(from).join(to);
   }
+}
+
+function normalizeNumberToken(raw) {
+  const text = String(raw);
+  const negative = text.includes("-");
+  const numeric = text.replace(/[^0-9.]/g, "");
+  const value = Number(numeric);
+  if (!Number.isFinite(value)) return null;
+  const decimal = numeric.includes(".") ? numeric.split(".").pop().length : 0;
+  return { value: negative ? -value : value, decimal };
+}
+
+function formatNumberLike(raw, value, decimal) {
+  const text = String(raw);
+  const fixed = value.toFixed(decimal);
+  const [intPart, fraction] = fixed.split(".");
+  const withCommas = /,\d{3}/.test(text)
+    ? intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+    : intPart;
+  const prefix = (text.match(/^[^\d-]+/) || [""])[0];
+  const suffix = (text.match(/[^\d.]+$/) || [""])[0];
+  return prefix + withCommas + (fraction !== undefined ? "." + fraction : "") + suffix;
+}
+
+function scheduleIncrementCacheSave() {
+  if (incrementCacheTimer) return;
+  incrementCacheTimer = setTimeout(() => {
+    incrementCacheTimer = null;
+    chrome.storage.local.set({ incrementCache }).catch(() => {});
+  }, 120);
+}
+
+function makeIncrementCacheKey(rule, match, token, index) {
+  return [
+    location.hostname,
+    rule.id || rule.from,
+    rule.updatedAt || rule.createdAt || "",
+    match,
+    token,
+    index,
+  ].join("::");
+}
+
+function getCachedIncrement(rule, match, token, index) {
+  const config = rule.valueTransform;
+  const min = Number(config?.min);
+  const max = Number(config?.max);
+  if (!config?.enabled || !Number.isFinite(min) || !Number.isFinite(max)) return 0;
+  const low = Math.min(min, max);
+  const high = Math.max(min, max);
+  const key = makeIncrementCacheKey(rule, match, token, index);
+  if (typeof incrementCache[key] === "number") return incrementCache[key];
+  const decimalPlaces = Math.max(
+    String(low).split(".")[1]?.length || 0,
+    String(high).split(".")[1]?.length || 0,
+  );
+  const delta = Number((low + Math.random() * (high - low)).toFixed(decimalPlaces));
+  incrementCache[key] = delta;
+  scheduleIncrementCacheSave();
+  return delta;
+}
+
+function applyValueTransform(replacement, rule, match) {
+  if (!rule.valueTransform?.enabled) return replacement;
+  let tokenIndex = 0;
+  return String(replacement).replace(
+    /(?:[$￥¥]\s*)?-?\d[\d,]*(?:\.\d+)?(?:\s*(?:元|万|亿|USD|CNY|RMB|美元|人民币))?/gi,
+    (token) => {
+      const parsed = normalizeNumberToken(token);
+      if (!parsed) return token;
+      const delta = getCachedIncrement(rule, match, token, tokenIndex++);
+      const decimal = Math.max(
+        parsed.decimal,
+        String(rule.valueTransform.min).split(".")[1]?.length || 0,
+        String(rule.valueTransform.max).split(".")[1]?.length || 0,
+      );
+      return formatNumberLike(token, parsed.value + delta, decimal);
+    },
+  );
+}
+
+function applyNumberRule(text, rule) {
+  return applyValueTransform(text, rule, text);
+}
+
+function replacementFor(rule, match) {
+  const base = rule.to || match;
+  return applyValueTransform(base, rule, match);
+}
+
+function applyRuleToText(text, rule) {
+  if (rule.type === "number") {
+    return applyNumberRule(text, rule);
+  }
+
+  if (rule.type === "regex") {
+    try {
+      return text.replace(new RegExp(rule.from, "g"), (match) =>
+        replacementFor(rule, match),
+      );
+    } catch {
+      return text;
+    }
+  }
+
+  if (rule.smart && !rule.valueTransform?.enabled) {
+    return smartReplace(text, rule.from, rule.to || "");
+  }
+
+  if (rule.smart) {
+    return smartReplace(text, rule.from, replacementFor(rule, rule.from));
+  }
+
+  return text.split(rule.from).join(replacementFor(rule, rule.from));
 }
 
 // ── i18n: load pick-mode strings from _locales ─────────
@@ -94,11 +210,12 @@ function matchesCurrentUrl(rule) {
 async function loadRules() {
   const [syncResult, localResult] = await Promise.all([
     chrome.storage.sync.get(["rules"]),
-    chrome.storage.local.get(["lang"]),
+    chrome.storage.local.get(["lang", "incrementCache"]),
   ]);
   uiLang = localResult.lang || "zh_CN";
+  incrementCache = localResult.incrementCache || {};
   currentRules = (syncResult.rules || []).filter(
-    (r) => r.enabled && r.from && matchesCurrentUrl(r),
+    (r) => r.enabled && (r.from || r.type === "number") && matchesCurrentUrl(r),
   );
   await loadUIMessages(uiLang);
 }
@@ -116,7 +233,7 @@ function shouldSkipNode(node) {
 function applyRules(text, anchorEl, ruleSet) {
   let result = text;
   for (const rule of ruleSet) {
-    if (!rule.from) continue;
+    if (!rule.from && rule.type !== "number") continue;
     if (rule.scope?.domSelector) {
       try {
         if (!anchorEl?.closest(rule.scope.domSelector)) continue;
@@ -124,15 +241,7 @@ function applyRules(text, anchorEl, ruleSet) {
         continue;
       }
     }
-    if (rule.type === "regex") {
-      try {
-        result = result.replace(new RegExp(rule.from, "g"), rule.to || "");
-      } catch {}
-    } else if (rule.smart) {
-      result = smartReplace(result, rule.from, rule.to || "");
-    } else {
-      result = result.split(rule.from).join(rule.to || "");
-    }
+    result = applyRuleToText(result, rule);
   }
   return result;
 }
@@ -373,7 +482,7 @@ async function exitPickMode(selector) {
 function applyTempRules(tempRules) {
   if (!tempRules?.length) return;
   const active = tempRules.filter(
-    (r) => r.enabled && r.from && matchesCurrentUrl(r),
+    (r) => r.enabled && (r.from || r.type === "number") && matchesCurrentUrl(r),
   );
   if (!active.length) return;
 
@@ -528,6 +637,11 @@ function applyZhQuoteParser(scope) {
 // ── Message listener ───────────────────────────────────
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === "TEXT_SWAP_RULES_UPDATED") refresh();
+  if (message.type === "TEXT_SWAP_INCREMENT_CACHE_CLEARED") {
+    incrementCache = {};
+    processedMark = new WeakMap();
+    refresh();
+  }
   if (message.type === "TEXT_SWAP_PICK_START") loadRules().then(enterPickMode);
   if (message.type === "TEXT_SWAP_APPLY_TEMP") applyTempRules(message.rules);
   if (message.type === "TEXT_SWAP_APPLY_PUNCT") {

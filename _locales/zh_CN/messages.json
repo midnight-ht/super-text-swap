@@ -16,7 +16,11 @@
   "subtitle": { "message": "网页文本替换助手" },
 
   "fromLabel": { "message": "原文本" },
-  "fromPh": { "message": "输入需要替换的文本" },
+  "fromPh": { "message": "普通文本，或输入正则表达式" },
+  "regexHelpBtn": { "message": "❓" },
+  "regexHelpHtml": {
+    "message": "<h3>基础匹配规则</h3><ul><li><b>精确匹配：</b>输入什么就找什么。输入 <code>cat</code> 只匹配 cat。</li><li><b>任意单个字符：</b><code>.</code>，例如 <code>c.t</code> 可匹配 cat、cot、cut。</li><li><b>任意多个字符：</b><code>.*</code>，例如 <code>c.*t</code> 可匹配 ct、cat、connect。</li></ul><h4>常用正则符号</h4><table><tr><th>符号</th><th>作用</th><th>示例</th></tr><tr><td><code>\\d</code></td><td>任意数字</td><td><code>202\\d</code></td></tr><tr><td><code>\\w</code></td><td>字母、数字或下划线</td><td><code>user_\\w</code></td></tr><tr><td><code>^</code></td><td>文本开头</td><td><code>^Apple</code></td></tr><tr><td><code>$</code></td><td>文本结尾</td><td><code>End$</code></td></tr><tr><td><code>+</code></td><td>出现 1 次或多次</td><td><code>\\d+</code></td></tr><tr><td><code>?</code></td><td>出现 0 次或 1 次</td><td><code>apples?</code></td></tr></table>"
+  },
   "toLabel": { "message": "替换为" },
   "toPh": { "message": "输入替换后的文本" },
 
@@ -30,8 +34,13 @@
   "domPh": { "message": "CSS 选择器（留空为全页面）" },
   "pickBtn": { "message": "⊕ 拾取" },
   "targetLabel": { "message": "替换目标（扩展）" },
+  "featureTitle": { "message": "功能" },
   "includeInputsLabel": { "message": "输入框内容（input / textarea）" },
   "includeEditableLabel": { "message": "富文本编辑器（contenteditable）" },
+  "numberTransformLabel": { "message": "数字 / 金额随机增加" },
+  "incrementEnabledLabel": { "message": "数字 / 金额随机增加" },
+  "incrementMinPh": { "message": "最小增加" },
+  "incrementMaxPh": { "message": "最大增加" },
 
   "addBtn": { "message": "添加规则" },
   "clearBtn": { "message": "清空规则" },
@@ -40,6 +49,12 @@
   "countSuffix": { "message": " 条" },
   "badgeInput": { "message": "输入框" },
   "badgeEditable": { "message": "富文本" },
+  "badgeRegex": { "message": "正则" },
+  "badgeNumberFeature": { "message": "数字/金额" },
+  "badgeIncrement": {
+    "message": "自增 $RANGE$",
+    "placeholders": { "range": { "content": "$1" } }
+  },
 
   "toastAdded": { "message": "规则已添加" },
   "toastDeleted": { "message": "规则已删除" },
@@ -50,7 +65,12 @@
   "toastNoPick": { "message": "此页面不支持元素拾取" },
   "toastNoRules": { "message": "暂无规则可清空" },
   "toastExists": { "message": "该原文本规则已存在" },
-  "toastFromRequired": { "message": "请输入原文本" },
+  "numberRuleFrom": { "message": "自动匹配数字 / 金额" },
+
+  "toastFromRequired": { "message": "请输入原文本，或启用数字 / 金额随机增加" },
+  "toastRegexInvalid": { "message": "正则表达式无效" },
+  "toastIncrementRangeRequired": { "message": "请输入有效的自增范围" },
+  "toastIncrementRefreshed": { "message": "自增缓存已刷新" },
   "toastSelectorFilled": {
     "message": "已填入：$SELECTOR$",
     "placeholders": {
@@ -66,12 +86,13 @@
   "pickCancel": { "message": "已取消" },
 
   "toastTempApplied": { "message": "已临时应用到当前页面" },
-  "toastTempFromRequired": { "message": "请先输入原文本再临时应用" },
+  "toastTempFromRequired": { "message": "请先输入原文本，或启用数字 / 金额随机增加" },
   "toastPunctApplied": { "message": "标点符号已转换（临时）" },
 
   "quickLabel": { "message": "快捷操作" },
   "punctZhBtn": { "message": "→ 转中文标点" },
   "punctEnBtn": { "message": "→ 转英文标点" },
+  "refreshIncrementBtn": { "message": "刷新自增" },
 
   "helpTitle": { "message": "功能说明" },
   "helpClose": { "message": "关闭" },
@@ -98,6 +119,16 @@
 
   "helpS5Title": { "message": "规则列表" },
   "helpS5Desc": {
-    "message": "已保存的规则按添加顺序依次执行。点击 × 删除单条，「清空规则」删除全部。带颜色标签表示该规则设置了 URL 或元素范围限定。"
+    "message": "已保存的规则按添加顺序依次执行。点击 × 删除单条，「清空规则」删除全部。带颜色标签表示该规则设置了 URL、元素范围或替换模式。"
+  },
+
+  "helpS6Title": { "message": "正则匹配" },
+  "helpS6Desc": {
+    "message": "原文本会自动判断匹配方式：普通文本精确匹配；包含 .、.*、\\d、\\w、+、? 等规则时按正则表达式查找。"
+  },
+
+  "helpS7Title": { "message": "数字 / 金额随机增加" },
+  "helpS7Desc": {
+    "message": "在「功能」中启用后，会自动匹配页面里的数字和金额，并按设置范围随机增加。增量会缓存，刷新页面仍保持一致。点击「刷新自增」会清空缓存并刷新当前页面，重新生成增量。"
   }
 }

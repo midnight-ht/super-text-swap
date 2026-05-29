@@ -140,6 +140,109 @@
         color: #9ca3af;
       }
 
+      .from-control {
+        position: relative;
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .from-control input[type="text"] {
+        min-width: 0;
+      }
+      .regex-help {
+        position: relative;
+        flex-shrink: 0;
+      }
+      .regex-help-btn {
+        width: 24px;
+        height: 24px;
+        border: 1px solid #bfdbfe;
+        border-radius: 50%;
+        background: #eff6ff;
+        color: #2563eb;
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1;
+        cursor: help;
+      }
+      .regex-help-bubble {
+        display: none;
+        position: absolute;
+        top: 24px;
+        right: 0;
+        z-index: 80;
+        width: 330px;
+        max-width: calc(100vw - 36px);
+        overflow: visible;
+        padding: 14px 16px;
+        border-radius: 8px;
+        background: #111827;
+        color: #e5e7eb;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.28);
+        font-size: 12px;
+        line-height: 1.7;
+      }
+      .regex-help:hover .regex-help-bubble,
+      .regex-help:focus-within .regex-help-bubble {
+        display: block;
+      }
+      .regex-help-bubble h3 {
+        margin: 0 0 8px;
+        font-size: 13px;
+        color: #fff;
+      }
+      .regex-help-bubble h4 {
+        margin: 12px 0 6px;
+        font-size: 12px;
+        color: #bfdbfe;
+      }
+      .regex-help-bubble ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+      .regex-help-bubble table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 6px;
+      }
+      .regex-help-bubble th,
+      .regex-help-bubble td {
+        border-top: 1px solid #374151;
+        padding: 5px 4px;
+        text-align: left;
+        vertical-align: top;
+      }
+      .regex-help-bubble code {
+        background: #1f2937;
+        border-radius: 4px;
+        padding: 1px 4px;
+        color: #f9fafb;
+      }
+
+      .feature-options {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 9px 10px;
+        margin: 8px 0 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .feature-options-title {
+        font-size: 11px;
+        font-weight: 600;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+      }
+      .feature-options-row {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
       /* ── Advanced toggle ── */
       .advanced-toggle {
         display: flex;
@@ -285,6 +388,31 @@
         cursor: pointer;
       }
 
+      .number-range {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .number-range input {
+        min-width: 0;
+        flex: 1;
+        height: 28px;
+        padding: 0 8px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 12px;
+        color: #111;
+        outline: none;
+        background: #fff;
+      }
+      .number-range input:focus {
+        border-color: #2563eb;
+      }
+      .range-sep {
+        color: #9ca3af;
+        font-size: 12px;
+      }
+
       /* ── Buttons ── */
       .btn-row {
         display: flex;
@@ -425,6 +553,11 @@
         background: #fff7ed;
         color: #c2410c;
         border: 1px solid #fed7aa;
+      }
+      .badge-mode {
+        background: #f5f3ff;
+        color: #6d28d9;
+        border: 1px solid #ddd6fe;
       }
 
       .empty-state {
@@ -586,14 +719,52 @@
       </div>
     </div>
 
-    <div class="form-section">
+      <div class="form-section">
       <div class="input-row">
         <span class="input-label" id="fromLabel">原文本</span>
-        <input type="text" id="fromInput" placeholder="输入需要替换的文本" />
+        <div class="from-control">
+          <input type="text" id="fromInput" placeholder="输入需要替换的文本" />
+          <div class="regex-help">
+            <button
+              class="regex-help-btn"
+              id="regexHelpBtn"
+              type="button"
+              aria-label="正则规则说明"
+            >
+              ❓
+            </button>
+            <div class="regex-help-bubble" id="regexHelpBubble"></div>
+          </div>
+        </div>
       </div>
       <div class="input-row">
         <span class="input-label" id="toLabel">替换为</span>
         <input type="text" id="toInput" placeholder="输入替换后的文本" />
+      </div>
+
+      <div class="feature-options">
+        <div class="feature-options-title" id="featureTitle">功能</div>
+        <div class="feature-options-row">
+          <label class="checkbox-label">
+            <input type="checkbox" id="incrementEnabled" />
+            <span id="incrementEnabledLabel">数字 / 金额随机增加</span>
+          </label>
+          <div class="number-range">
+            <input
+              type="number"
+              id="incrementMin"
+              step="0.01"
+              placeholder="最小增加"
+            />
+            <span class="range-sep">-</span>
+            <input
+              type="number"
+              id="incrementMax"
+              step="0.01"
+              placeholder="最大增加"
+            />
+          </div>
+        </div>
       </div>
 
       <div class="advanced-toggle" id="advancedToggle">
@@ -675,6 +846,7 @@
       <div class="quick-btns">
         <button class="btn-quick" id="punctZhBtn">→ 转中文标点</button>
         <button class="btn-quick" id="punctEnBtn">→ 转英文标点</button>
+        <button class="btn-quick" id="refreshIncrementBtn">刷新自增</button>
       </div>
     </div>
 

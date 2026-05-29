@@ -99,6 +99,9 @@ const urlPatternInput   = q('urlPatternInput');
 const domSelectorInput  = q('domSelectorInput');
 const includeInputsCb   = q('includeInputs');
 const includeEditableCb = q('includeEditable');
+const incrementEnabledCb = q('incrementEnabled');
+const incrementMinInput  = q('incrementMin');
+const incrementMaxInput  = q('incrementMax');
 
 // ── Toast ──────────────────────────────────────────────
 let toastTimer = null;
@@ -120,12 +123,15 @@ function escapeHtml(str) {
 function applyTranslations() {
   const setText = (id, key, sub) => { const el = q(id); if (el) el.textContent = t(key, sub); };
   const setPh   = (id, key)      => { const el = q(id); if (el) el.placeholder  = t(key); };
+  const setHtml = (id, key)      => { const el = q(id); if (el) el.innerHTML    = t(key); };
 
   setText('langToggleBtn',        'langToggle');
   setText('applyBtn',             'applyBtn');
   setText('headerSubtitle',       'subtitle');
   setText('fromLabel',            'fromLabel');
   setPh  ('fromInput',            'fromPh');
+  setText('regexHelpBtn',         'regexHelpBtn');
+  setHtml('regexHelpBubble',      'regexHelpHtml');
   setText('toLabel',              'toLabel');
   setPh  ('toInput',              'toPh');
   setText('advancedToggleText',   'advancedTitle');
@@ -138,14 +144,19 @@ function applyTranslations() {
   setPh  ('domSelectorInput',     'domPh');
   setText('pickBtn',              'pickBtn');
   setText('targetLabel',          'targetLabel');
+  setText('featureTitle',         'featureTitle');
   setText('includeInputsLabel',   'includeInputsLabel');
   setText('includeEditableLabel', 'includeEditableLabel');
+  setText('incrementEnabledLabel','incrementEnabledLabel');
+  setPh  ('incrementMin',         'incrementMinPh');
+  setPh  ('incrementMax',         'incrementMaxPh');
   setText('addBtn',               'addBtn');
   setText('clearBtn',             'clearBtn');
   setText('rulesTitle',           'rulesTitle');
   setText('quickLabel',           'quickLabel');
   setText('punctZhBtn',           'punctZhBtn');
   setText('punctEnBtn',           'punctEnBtn');
+  setText('refreshIncrementBtn',  'refreshIncrementBtn');
   setText('helpTitle',            'helpTitle');
   setText('helpClose',            'helpClose');
 
@@ -181,6 +192,8 @@ function renderHelpBody() {
     ['helpS3Title', 'helpS3Desc'],
     ['helpS4Title', 'helpS4Desc'],
     ['helpS5Title', 'helpS5Desc'],
+    ['helpS6Title', 'helpS6Desc'],
+    ['helpS7Title', 'helpS7Desc'],
   ];
   q('helpBody').innerHTML = sections.map(([tk, dk]) => `
     <div class="help-section">
@@ -223,6 +236,9 @@ async function restorePickerState() {
     urlPatternInput.value       = s.urlPattern  || '';
     includeInputsCb.checked     = !!s.includeInputs;
     includeEditableCb.checked   = !!s.includeEditable;
+    incrementEnabledCb.checked  = !!s.incrementEnabled;
+    incrementMinInput.value     = s.incrementMin || '';
+    incrementMaxInput.value     = s.incrementMax || '';
     await chrome.storage.local.remove(['pendingFormState']);
   }
 
@@ -250,6 +266,9 @@ q('pickBtn').addEventListener('click', async () => {
       urlPattern:      urlPatternInput.value,
       includeInputs:   includeInputsCb.checked,
       includeEditable: includeEditableCb.checked,
+      incrementEnabled: incrementEnabledCb.checked,
+      incrementMin:     incrementMinInput.value,
+      incrementMax:     incrementMaxInput.value,
     },
   });
 
@@ -311,17 +330,44 @@ async function applyPunctPreset(type) {
 // The effect resets on page refresh.
 async function applyTemp() {
   const from = fromInput.value.trim();
-  if (!from) { showToast(t('toastTempFromRequired')); fromInput.focus(); return; }
-
   const to    = toInput.value.trim();
   const scope = readScopeFromForm();
-  const tempRule = { id: '__temp__', from, to, type: 'plain', enabled: true, scope };
+  const valueTransform = readValueTransformFromForm();
+  if (!from && !valueTransform) { showToast(t('toastTempFromRequired')); fromInput.focus(); return; }
+  if (from && !isRegexValid(from)) { showToast(t('toastRegexInvalid')); fromInput.focus(); return; }
+  if (incrementEnabledCb.checked && !valueTransform) {
+    showToast(t('toastIncrementRangeRequired'));
+    incrementMinInput.focus();
+    return;
+  }
+  const tempRules = [];
+  if (from) {
+    tempRules.push({
+      id: '__temp_text__',
+      from,
+      to,
+      type: inferRuleType(from),
+      enabled: true,
+      scope,
+    });
+  }
+  if (valueTransform) {
+    tempRules.push({
+      id: '__temp_number__',
+      from: '',
+      to: '',
+      type: 'number',
+      valueTransform,
+      enabled: true,
+      scope,
+    });
+  }
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) { showToast(t('toastNoPage')); return; }
 
   const sendTemp = () =>
-    chrome.tabs.sendMessage(tab.id, { type: 'TEXT_SWAP_APPLY_TEMP', rules: [tempRule] });
+    chrome.tabs.sendMessage(tab.id, { type: 'TEXT_SWAP_APPLY_TEMP', rules: tempRules });
 
   try {
     await sendTemp();
@@ -350,7 +396,30 @@ function getScopeBadgesHtml(rule) {
     parts.push(`<span class="badge badge-target">${t('badgeInput')}</span>`);
   if (includeEditable)
     parts.push(`<span class="badge badge-target">${t('badgeEditable')}</span>`);
+  if (rule.type === 'regex')
+    parts.push(`<span class="badge badge-mode">${t('badgeRegex')}</span>`);
+  if (rule.type === 'number')
+    parts.push(`<span class="badge badge-mode">${t('badgeNumberFeature')}</span>`);
+  if (rule.valueTransform?.enabled)
+    parts.push(`<span class="badge badge-mode">${t('badgeIncrement', formatIncrementRange(rule.valueTransform))}</span>`);
   return parts.length ? `<div class="rule-badges">${parts.join('')}</div>` : '';
+}
+
+function getRuleBadgesHtml(rule) {
+  const scopeHtml = getScopeBadgesHtml(rule);
+  if (scopeHtml) return scopeHtml;
+  const parts = [];
+  if (rule.type === 'regex')
+    parts.push(`<span class="badge badge-mode">${t('badgeRegex')}</span>`);
+  if (rule.type === 'number')
+    parts.push(`<span class="badge badge-mode">${t('badgeNumberFeature')}</span>`);
+  if (rule.valueTransform?.enabled)
+    parts.push(`<span class="badge badge-mode">${t('badgeIncrement', formatIncrementRange(rule.valueTransform))}</span>`);
+  return parts.length ? `<div class="rule-badges">${parts.join('')}</div>` : '';
+}
+
+function formatIncrementRange(config) {
+  return `${config.min}~${config.max}`;
 }
 
 function renderRules() {
@@ -366,17 +435,26 @@ function renderRules() {
   rulesList.innerHTML = rules.map((rule, index) => `
     <div class="rule-item">
       <div class="rule-main">
-        <span class="rule-from" title="${escapeHtml(rule.from)}">${escapeHtml(rule.from)}</span>
+        <span class="rule-from" title="${escapeHtml(getRuleFromText(rule))}">${escapeHtml(getRuleFromText(rule))}</span>
         <span class="rule-arrow">&#x2192;</span>
-        <span class="rule-to"   title="${escapeHtml(rule.to)}">${escapeHtml(rule.to)}</span>
+        <span class="rule-to"   title="${escapeHtml(getRuleToText(rule))}">${escapeHtml(getRuleToText(rule))}</span>
         <button class="rule-delete" data-index="${index}">&#xD7;</button>
       </div>
-      ${getScopeBadgesHtml(rule)}
+      ${getRuleBadgesHtml(rule)}
     </div>
   `).join('');
   rulesList.querySelectorAll('.rule-delete').forEach(btn => {
     btn.addEventListener('click', e => deleteRule(parseInt(e.target.dataset.index, 10)));
   });
+}
+
+function getRuleFromText(rule) {
+  return rule.type === 'number' ? t('numberRuleFrom') : rule.from;
+}
+
+function getRuleToText(rule) {
+  if (rule.type === 'number') return formatIncrementRange(rule.valueTransform || {});
+  return rule.to;
 }
 
 // ── Rule CRUD ──────────────────────────────────────────
@@ -396,6 +474,32 @@ function readScopeFromForm() {
   return hasScope ? { urlMode, urlPattern, domSelector, includeInputs, includeEditable } : null;
 }
 
+function looksLikeRegex(pattern) {
+  return /\\[dDsSwWbB]|\[[^\]]+\]|\([^)]*\)|\{\d+(?:,\d*)?\}|[|^$+*?]/.test(pattern) || /(^|[^\\])\./.test(pattern);
+}
+
+function inferRuleType(pattern) {
+  return looksLikeRegex(pattern) ? 'regex' : 'plain';
+}
+
+function isRegexValid(pattern) {
+  if (!looksLikeRegex(pattern)) return true;
+  try {
+    new RegExp(pattern, 'g');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readValueTransformFromForm() {
+  if (!incrementEnabledCb.checked) return null;
+  const min = Number(incrementMinInput.value);
+  const max = Number(incrementMaxInput.value);
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
+  return { enabled: true, min, max };
+}
+
 function resetForm() {
   fromInput.value = '';
   toInput.value   = '';
@@ -405,6 +509,9 @@ function resetForm() {
   domSelectorInput.value     = '';
   includeInputsCb.checked    = false;
   includeEditableCb.checked  = false;
+  incrementEnabledCb.checked = false;
+  incrementMinInput.value    = '';
+  incrementMaxInput.value    = '';
   fromInput.focus();
 }
 
@@ -425,16 +532,46 @@ async function notifyPageRefresh() {
 async function addRule() {
   const from = fromInput.value.trim();
   const to   = toInput.value.trim();
-  if (!from) { showToast(t('toastFromRequired')); fromInput.focus(); return; }
-  if (rules.find(r => r.from === from)) { showToast(t('toastExists')); return; }
+  const valueTransform = readValueTransformFromForm();
+  if (!from && !valueTransform) { showToast(t('toastFromRequired')); fromInput.focus(); return; }
+  if (from && !isRegexValid(from)) { showToast(t('toastRegexInvalid')); fromInput.focus(); return; }
+  if (incrementEnabledCb.checked && !valueTransform) {
+    showToast(t('toastIncrementRangeRequired'));
+    incrementMinInput.focus();
+    return;
+  }
+  if (from && rules.find(r => r.from === from)) { showToast(t('toastExists')); return; }
   const now = Date.now();
-  rules.push({ id: generateId(), from, to, type: 'plain', enabled: true,
-               scope: readScopeFromForm(), createdAt: now, updatedAt: now });
+  const scope = readScopeFromForm();
+  if (from) {
+    rules.push({ id: generateId(), from, to, type: inferRuleType(from), enabled: true,
+                 scope, createdAt: now, updatedAt: now });
+  }
+  if (valueTransform) {
+    rules.push({ id: generateId(), from: '', to: '', type: 'number', enabled: true,
+                 valueTransform, scope, createdAt: now, updatedAt: now });
+  }
   await saveRules();
   renderRules();
   resetForm();
   showToast(t('toastAdded'));
   notifyPageRefresh();
+}
+
+async function refreshIncrementCache() {
+  await chrome.storage.local.set({ incrementCache: {} });
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (tab?.id) {
+    try {
+      await chrome.tabs.sendMessage(tab.id, { type: 'TEXT_SWAP_INCREMENT_CACHE_CLEARED' });
+    } catch {
+      try {
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['src/content/content.js'] });
+      } catch {}
+    }
+    chrome.tabs.reload(tab.id).catch(() => {});
+  }
+  showToast(t('toastIncrementRefreshed'));
 }
 
 async function deleteRule(index) {
@@ -460,6 +597,7 @@ q('clearBtn').addEventListener('click',   clearRules);
 q('applyBtn').addEventListener('click',   applyTemp);
 q('punctZhBtn').addEventListener('click', () => applyPunctPreset('zh'));
 q('punctEnBtn').addEventListener('click', () => applyPunctPreset('en'));
+q('refreshIncrementBtn').addEventListener('click', refreshIncrementCache);
 q('langToggleBtn').addEventListener('click', toggleLang);
 fromInput.addEventListener('keydown', e => { if (e.key === 'Enter') toInput.focus(); });
 toInput.addEventListener('keydown',   e => { if (e.key === 'Enter') addRule(); });
