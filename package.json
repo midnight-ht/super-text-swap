@@ -1,11 +1,12 @@
 {
   "name": "super-text-swap-extension",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "private": true,
   "description": "Chrome extension build toolchain",
   "scripts": {
     "build": "node build.js",
-    "build:plain": "cross-env NO_OBFUSCATE=1 node build.js"
+    "build:plain": "cross-env NO_OBFUSCATE=1 node build.js",
+    "test": "node --test"
   },
   "devDependencies": {
     "archiver": "^6.0.1",

@@ -66,7 +66,7 @@ Load the unpacked `dist/` folder via Chrome → Extensions → **Load unpacked**
 
 ### Element Picker
 
-Click **⊕ Pick** → the popup closes and a blue highlight follows your cursor. Click any element to capture its CSS selector. Reopen the popup to find the selector pre-filled.
+Click **⊕ Pick** → the popup closes and a blue highlight follows your cursor. Click any element to select its CSS selector, then choose **Use as rule scope** or cancel from the lightweight toolbar.
 
 ---
 

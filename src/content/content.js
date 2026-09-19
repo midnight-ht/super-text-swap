@@ -296,7 +296,7 @@ async function loadUIMessages(locale) {
       return;
     }
     const url = chrome.runtime.getURL(`_locales/${locale}/messages.json`);
-    if (!url || url.includes("://invalid/")) {
+    if (!url || /^chrome-extension:\/\/invalid(?:\/|$)/.test(url)) {
       uiMessages = {};
       return;
     }
@@ -307,9 +307,9 @@ async function loadUIMessages(locale) {
 }
 
 const msg = (key, sub) => {
-  let str = uiMessages[key]?.message ?? key;
-  if (sub !== undefined) str = str.replace(/\$[A-Z_]+\$/g, sub);
-  return str;
+  return window.SuperTextSwapI18n?.resolveMessage(key, sub, chrome, uiMessages, uiLang)
+    || uiMessages[key]?.message
+    || key;
 };
 
 // ── URL scope matching ─────────────────────────────────
@@ -939,7 +939,7 @@ function onPickClick(e) {
     }
     return;
   }
-  exitPickMode(generateSelector(e.target));
+  showPickResultToolbar(e.target);
 }
 
 function onPickKeyDown(e) {
@@ -1053,6 +1053,56 @@ function btnStyle(bg) {
 function updatePickToolbar() {
   const label = document.getElementById("__SuperTextSwap_pickcount__");
   if (label) label.textContent = msg("pickMultiCount", String(pickedSelectors.length));
+}
+
+function showPickResultToolbar(element) {
+  cleanupPickMode();
+  const toolbar = document.createElement("div");
+  toolbar.id = "__SuperTextSwap_pickresult__";
+  toolbar.style.cssText = [
+    "position:fixed",
+    "top:16px",
+    "left:50%",
+    "transform:translateX(-50%)",
+    "z-index:2147483647",
+    "display:flex",
+    "gap:6px",
+    "align-items:center",
+    "background:#111827",
+    "color:#fff",
+    "padding:8px 10px",
+    "border-radius:10px",
+    "font:13px/1 system-ui,sans-serif",
+    "box-shadow:0 6px 24px rgba(0,0,0,0.35)",
+    "max-width:calc(100vw - 24px)",
+    "overflow:auto",
+  ].join(";");
+
+  const title = document.createElement("span");
+  title.textContent = msg("pickSelectedTitle");
+  title.style.cssText = "margin:0 4px 0 2px;white-space:nowrap;font-weight:600";
+
+  const useButton = document.createElement("button");
+  useButton.textContent = msg("pickUseForRule");
+  useButton.style.cssText = btnStyle("#16a34a");
+  useButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    exitPickMode(generateSelector(element));
+  });
+
+  const cancelButton = document.createElement("button");
+  cancelButton.textContent = msg("pickCancelBtn");
+  cancelButton.style.cssText = btnStyle("#4b5563");
+  cancelButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    exitPickMode(null);
+  });
+
+  toolbar.append(title, useButton, cancelButton);
+  pickToolbar = toolbar;
+  document.body.appendChild(toolbar);
 }
 
 function cleanupPickMode() {

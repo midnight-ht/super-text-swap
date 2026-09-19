@@ -13,6 +13,9 @@
     "description": "Label shown on language toggle button"
   },
   "applyBtn": { "message": "⟳ Apply Now" },
+  "displayModeToSidebar": { "message": "Switch to side panel" },
+  "displayModeToPopup": { "message": "Switch to popup" },
+  "toastDisplayModeFailed": { "message": "Unable to switch display mode" },
   "subtitle": { "message": "Web Text Replacer" },
 
   "fromLabel": { "message": "From" },
@@ -24,7 +27,7 @@
   "toLabel": { "message": "To" },
   "toPh": { "message": "Replacement text" },
 
-  "advancedTitle": { "message": "Scope & Targets" },
+  "advancedTitle": { "message": "Scope" },
   "urlScopeLabel": { "message": "URL Scope" },
   "urlAll": { "message": "All pages" },
   "urlDomain": { "message": "Current domain" },
@@ -34,7 +37,7 @@
   "domPh": { "message": "CSS selector / xpath=... (empty = entire page)" },
   "pickBtn": { "message": "⊕ Pick" },
   "targetLabel": { "message": "Extra Targets" },
-  "featureToggleText": { "message": "Extended Features" },
+  "featureToggleText": { "message": "Enhancements" },
   "featureTitle": { "message": "Random Number / Amount Increase" },
   "includeInputsLabel": { "message": "Input fields (input / textarea)" },
   "includeEditableLabel": { "message": "Rich text editor (contenteditable)" },
@@ -77,6 +80,8 @@
   },
   "pickDoneBtn": { "message": "Done" },
   "pickCancelBtn": { "message": "Cancel" },
+  "pickSelectedTitle": { "message": "Element selected" },
+  "pickUseForRule": { "message": "Use as rule scope" },
 
   "addBtn": { "message": "Add Rule" },
   "clearBtn": { "message": "Clear All" },

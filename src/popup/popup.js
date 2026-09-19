@@ -109,6 +109,10 @@ const computeEnabledCb     = q('computeEnabled');
 const computeOpSelect      = q('computeOp');
 const computeKeepFormatCb  = q('computeKeepFormat');
 const computeSourcesDisplay = q('computeSourcesDisplay');
+const previewFrom          = q('previewFrom');
+const previewTo            = q('previewTo');
+const headerDomain         = q('headerDomain');
+const displayModeBtn       = q('displayModeBtn');
 
 // Working list of picked source selectors for the auto-compute feature.
 let computeSources = [];
@@ -120,6 +124,62 @@ function showToast(msg) {
   toast.classList.add('show');
   if (toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
+}
+
+function updatePreview() {
+  if (!previewFrom || !previewTo) return;
+  previewFrom.textContent = fromInput.value.trim() || '示例文本';
+  previewTo.textContent = toInput.value || '示例文本';
+}
+
+let displayMode = 'popup';
+
+function updateDisplayModeButton() {
+  document.body.classList.toggle('sidebar-mode', displayMode === 'sidebar');
+  if (!displayModeBtn) return;
+  const toSidebar = displayMode !== 'sidebar';
+  const label = t(toSidebar ? 'displayModeToSidebar' : 'displayModeToPopup');
+  displayModeBtn.textContent = '↔';
+  displayModeBtn.title = label;
+  displayModeBtn.setAttribute('aria-label', label);
+}
+
+async function switchDisplayMode(nextMode) {
+  const mode = nextMode === 'sidebar' ? 'sidebar' : 'popup';
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+  if (mode === 'sidebar') {
+    if (tab?.windowId === undefined) throw new Error('Active window unavailable');
+    const openPromise = chrome.sidePanel.open({ windowId: tab.windowId });
+    const result = await chrome.runtime.sendMessage({
+      type: 'TEXT_SWAP_SET_DISPLAY_MODE',
+      mode,
+    });
+    await openPromise;
+    if (!result?.ok) throw new Error(result?.error || 'Display mode switch failed');
+    displayMode = mode;
+    window.close();
+    return;
+  }
+
+  const result = await chrome.runtime.sendMessage({
+    type: 'TEXT_SWAP_SET_DISPLAY_MODE',
+    mode,
+  });
+  if (!result?.ok) throw new Error(result?.error || 'Display mode switch failed');
+  displayMode = mode;
+  updateDisplayModeButton();
+  if (chrome.sidePanel?.close && tab?.windowId !== undefined) {
+    await chrome.sidePanel.close({ windowId: tab.windowId }).catch(() => {});
+  }
+}
+
+async function toggleDisplayMode() {
+  try {
+    await switchDisplayMode(displayMode === 'sidebar' ? 'popup' : 'sidebar');
+  } catch {
+    showToast(t('toastDisplayModeFailed'));
+  }
 }
 
 // ── Security ───────────────────────────────────────────
@@ -137,6 +197,7 @@ function applyTranslations() {
 
   setText('langToggleBtn',        'langToggle');
   setText('applyBtn',             'applyBtn');
+  updateDisplayModeButton();
   setText('headerSubtitle',       'subtitle');
   setText('fromLabel',            'fromLabel');
   setPh  ('fromInput',            'fromPh');
@@ -235,13 +296,21 @@ function closeHelp() { q('helpModal').classList.remove('open'); }
 q('helpBtn').addEventListener('click', openHelp);
 q('helpClose').addEventListener('click', closeHelp);
 q('helpModal').addEventListener('click', e => { if (e.target === q('helpModal')) closeHelp(); });
+displayModeBtn.addEventListener('click', toggleDisplayMode);
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.type === 'TEXT_SWAP_RESTORE_PICKER') restorePickerState();
+});
 
 // ── Current tab hostname ───────────────────────────────
 chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
   if (!tab?.url) return;
   try {
     currentHostname = new URL(tab.url).hostname;
-    if (currentHostname) domainLabel.textContent = ` (${currentHostname})`;
+    if (currentHostname) {
+      domainLabel.textContent = ` (${currentHostname})`;
+      if (headerDomain) headerDomain.textContent = currentHostname;
+    }
   } catch {}
 });
 
@@ -328,7 +397,10 @@ async function launchPicker(messageType) {
 
   const send = () => chrome.tabs.sendMessage(tab.id, { type: messageType });
   try {
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['src/content/content.js'] });
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['src/content/i18n-utils.js', 'src/content/content.js'],
+    });
     await send();
   } catch {
     try {
@@ -521,16 +593,21 @@ function renderRules() {
   rulesList.innerHTML = rules.map((rule, index) => `
     <div class="rule-item">
       <div class="rule-main">
-        <span class="rule-from" title="${escapeHtml(getRuleFromText(rule))}">${escapeHtml(getRuleFromText(rule))}</span>
-        <span class="rule-arrow">&#x2192;</span>
-        <span class="rule-to"   title="${escapeHtml(getRuleToText(rule))}">${escapeHtml(getRuleToText(rule))}</span>
-        <button class="rule-delete" data-index="${index}">&#xD7;</button>
+        <button class="rule-toggle ${rule.enabled !== false ? 'is-on' : ''}" data-toggle-index="${index}" aria-label="切换规则状态" aria-pressed="${rule.enabled !== false}"><span></span></button>
+        <div class="rule-copy">
+          <span class="rule-from" title="${escapeHtml(getRuleFromText(rule))}">${escapeHtml(getRuleFromText(rule))}</span>
+          <span class="rule-to" title="${escapeHtml(getRuleToText(rule))}">替换为：${escapeHtml(getRuleToText(rule) || '自动计算结果')}</span>
+        </div>
+        <button class="rule-delete" data-index="${index}" aria-label="删除规则">&#x22EF;</button>
       </div>
       ${getRuleBadgesHtml(rule)}
     </div>
   `).join('');
+  rulesList.querySelectorAll('.rule-toggle').forEach(btn => {
+    btn.addEventListener('click', () => toggleRule(parseInt(btn.dataset.toggleIndex, 10)));
+  });
   rulesList.querySelectorAll('.rule-delete').forEach(btn => {
-    btn.addEventListener('click', e => deleteRule(parseInt(e.target.dataset.index, 10)));
+    btn.addEventListener('click', () => deleteRule(parseInt(btn.dataset.index, 10)));
   });
 }
 
@@ -728,6 +805,14 @@ async function deleteRule(index) {
   notifyPageRefresh();
 }
 
+async function toggleRule(index) {
+  if (!rules[index]) return;
+  rules[index].enabled = rules[index].enabled === false;
+  await saveRules();
+  renderRules();
+  notifyPageRefresh();
+}
+
 async function clearRules() {
   if (!rules.length) { showToast(t('toastNoRules')); return; }
   rules = [];
@@ -746,6 +831,8 @@ q('punctEnBtn').addEventListener('click', () => applyPunctPreset('en'));
 q('thousandsBtn').addEventListener('click', applyThousandsFormat);
 q('refreshIncrementBtn').addEventListener('click', refreshIncrementCache);
 q('langToggleBtn').addEventListener('click', toggleLang);
+fromInput.addEventListener('input', updatePreview);
+toInput.addEventListener('input', updatePreview);
 fromInput.addEventListener('keydown', e => { if (e.key === 'Enter') toInput.focus(); });
 toInput.addEventListener('keydown',   e => { if (e.key === 'Enter') addRule(); });
 
@@ -753,11 +840,13 @@ toInput.addEventListener('keydown',   e => { if (e.key === 'Enter') addRule(); }
 (async () => {
   const [syncResult, localResult] = await Promise.all([
     chrome.storage.sync.get(['rules']),
-    chrome.storage.local.get(['lang']),
+    chrome.storage.local.get(['lang', 'displayMode']),
   ]);
   rules = syncResult.rules || [];
   lang  = localResult.lang || 'zh_CN';
+  displayMode = localResult.displayMode === 'sidebar' ? 'sidebar' : 'popup';
   await loadMessages(lang);
   applyTranslations();
+  updatePreview();
   await restorePickerState();
 })();
